@@ -186,6 +186,105 @@ export const dashboardResponseSchema = z.object({
   }),
 });
 
+export const pastoralGuidanceVerseSchema = z.object({
+  reference: z.string(),
+  text: z.string(),
+});
+
+export const pastoralGuidanceResponseSchema = z.object({
+  ok: z.boolean(),
+  orientation: z.string().nullable().optional(),
+  prayer: z.string().nullable().optional(),
+  verses: z.array(pastoralGuidanceVerseSchema),
+  recommend_tutor: z.boolean(),
+  critical: z.boolean(),
+  error: z.string().nullable().optional(),
+});
+
+export const tutorStudentSchema = z.object({
+  id: z.number(),
+  student_id: z.number(),
+  name: z.string(),
+  email: z.string(),
+  status: z.string().nullable().optional(),
+  avatar_url: z.string().nullable().optional(),
+  avatar_initials: z.string().nullable().optional(),
+  avatar_color: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  pastoral_updated_at: z.string().nullable().optional(),
+  groups: z.array(z.string()).optional(),
+  pastoral_profile: z
+    .object({
+      has_children: z.boolean().nullable().optional(),
+      children_count: z.number().nullable().optional(),
+      sentimental_status: z.string().nullable().optional(),
+      family_situation: z.string().nullable().optional(),
+      current_challenges: z.string().nullable().optional(),
+      emotional_state: z.string().nullable().optional(),
+      spiritual_needs: z.string().nullable().optional(),
+      prayer_requests: z.string().nullable().optional(),
+      support_network: z.string().nullable().optional(),
+      communication_preferences: z.string().nullable().optional(),
+      care_alerts: z.string().nullable().optional(),
+      next_steps: z.string().nullable().optional(),
+      tutor_notes: z.string().nullable().optional(),
+      pastoral_updated_at: z.string().nullable().optional(),
+    })
+    .optional(),
+  profile: z
+    .object({
+      full_name: z.string().nullable().optional(),
+      first_name: z.string().nullable().optional(),
+      last_name: z.string().nullable().optional(),
+      email: z.string().nullable().optional(),
+      birth_date: z.string().nullable().optional(),
+      phone: z.string().nullable().optional(),
+      address: z.string().nullable().optional(),
+      country: z.string().nullable().optional(),
+      state: z.string().nullable().optional(),
+      city: z.string().nullable().optional(),
+      postal_code: z.string().nullable().optional(),
+    })
+    .optional(),
+  progress: z
+    .object({
+      overall_percentage: z.number(),
+      completed_lessons: z.number(),
+      total_lessons: z.number(),
+      courses: z.array(
+        z.object({
+          id: z.number(),
+          name: z.string(),
+          source: z.string().nullable().optional(),
+          owner_name: z.string().nullable().optional(),
+          completed_lessons: z.number(),
+          total_lessons: z.number(),
+          percentage: z.number(),
+        }),
+      ),
+    })
+    .optional(),
+});
+
+export const tutorGroupSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  start_date: z.string().nullable().optional(),
+  meeting_days: z.array(z.string()).optional(),
+  meeting_time: z.string().nullable().optional(),
+  modality: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  students_count: z.number().optional(),
+  students: z.array(tutorStudentSchema).optional(),
+});
+
+export const tutorUsersResponseSchema = z.object({
+  students: z.array(tutorStudentSchema),
+  groups: z.array(tutorGroupSchema),
+});
+
 export type ApiUser = z.infer<typeof userSchema>;
 export type Course = z.infer<typeof courseSchema>;
 export type CourseModule = z.infer<typeof courseModuleSchema>;
@@ -198,6 +297,11 @@ export type Meeting = z.infer<typeof meetingSchema>;
 export type AppNotification = z.infer<typeof notificationSchema>;
 export type DashboardAnnouncement = z.infer<typeof dashboardAnnouncementSchema>;
 export type DashboardDailyVerse = z.infer<typeof dashboardDailyVerseSchema>;
+export type PastoralGuidanceResponse = z.infer<typeof pastoralGuidanceResponseSchema>;
+export type PastoralGuidanceVerse = z.infer<typeof pastoralGuidanceVerseSchema>;
+export type TutorGroup = z.infer<typeof tutorGroupSchema>;
+export type TutorStudent = z.infer<typeof tutorStudentSchema>;
+export type TutorUsersResponse = z.infer<typeof tutorUsersResponseSchema>;
 
 export function extractApiData<T>(payload: T | { data: T }): T {
   if (payload && typeof payload === 'object' && 'data' in payload) {

@@ -5,16 +5,19 @@ import {
   CalendarDays,
   CircleUserRound,
   GraduationCap,
+  HeartHandshake,
   Home,
   LogIn,
   LogOut,
   MessageCircle,
   ArrowLeft,
+  UserCog,
+  UsersRound,
 } from 'lucide-react-native';
 import { Link, router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logout, me } from '../src/api/auth';
 import { getNotifications, markNotificationsRead } from '../src/api/notifications';
@@ -52,8 +55,12 @@ export default function RootLayout() {
               }}
             >
               <Stack.Screen name="index" options={{ headerBackVisible: false, title: 'MDS' }} />
-              <Stack.Screen name="login" options={{ title: 'Ingresar' }} />
+              <Stack.Screen name="login" options={{ headerShown: false, title: 'Ingresar' }} />
+              <Stack.Screen name="registro" options={{ headerShown: false, title: 'Registrarme' }} />
+              <Stack.Screen name="olvide-mi-contrasena" options={{ headerShown: false, title: 'Recuperar contrasena' }} />
               <Stack.Screen name="perfil" options={{ title: 'Mi perfil' }} />
+              <Stack.Screen name="orientacion-pastoral" options={{ title: 'Orientacion pastoral' }} />
+              <Stack.Screen name="usuarios" options={{ title: 'Usuarios' }} />
               <Stack.Screen name="anuncios/index" options={{ title: 'Anuncios' }} />
               <Stack.Screen name="anuncios/[id]" options={{ title: 'Anuncio' }} />
               <Stack.Screen name="cursos/index" options={{ title: 'Contenido' }} />
@@ -80,6 +87,14 @@ function getHeaderTitle(pathname: string): { icon: ScreenTitleIcon; text: string
 
   if (pathname === '/perfil') {
     return { icon: 'profile', text: 'Mi perfil' };
+  }
+
+  if (pathname === '/orientacion-pastoral') {
+    return { icon: 'pastoral', text: 'Orientacion pastoral' };
+  }
+
+  if (pathname === '/usuarios') {
+    return { icon: 'users', text: 'Usuarios' };
   }
 
   if (pathname.startsWith('/anuncios')) {
@@ -117,6 +132,14 @@ function AppHeaderTitle() {
   const pathname = usePathname();
   const title = getHeaderTitle(pathname);
 
+  if (pathname === '/') {
+    return (
+      <View style={styles.headerBrandTitle}>
+        <Image source={require('../assets/brand/mds-dove-black.png')} style={styles.headerBrandLogo} />
+      </View>
+    );
+  }
+
   return <ScreenTitle icon={title.icon} size="small" text={title.text} />;
 }
 
@@ -125,7 +148,18 @@ function getParentRoute(pathname: string) {
     return null;
   }
 
-  if (pathname === '/perfil' || pathname === '/anuncios' || pathname === '/cursos' || pathname === '/biblia') {
+  if (pathname === '/registro' || pathname === '/olvide-mi-contrasena') {
+    return '/login';
+  }
+
+  if (
+    pathname === '/perfil' ||
+    pathname === '/orientacion-pastoral' ||
+    pathname === '/usuarios' ||
+    pathname === '/anuncios' ||
+    pathname === '/cursos' ||
+    pathname === '/biblia'
+  ) {
     return '/';
   }
 
@@ -242,7 +276,9 @@ function HeaderActions() {
 
   const isLoggedIn = Boolean(tokenQuery.data && meQuery.data);
   const unreadCount = notificationsQuery.data?.unread_count ?? 0;
-  const initial = meQuery.data?.name?.trim()?.charAt(0)?.toUpperCase() || 'M';
+  const avatarUrl = meQuery.data?.avatar_url;
+  const avatarInitials = meQuery.data?.avatar_initials || meQuery.data?.name?.trim()?.charAt(0)?.toUpperCase() || 'M';
+  const avatarColor = meQuery.data?.avatar_color || '#1b6fd7';
 
   useEffect(() => {
     setOpenMenu(null);
@@ -328,9 +364,13 @@ function HeaderActions() {
         accessibilityRole="button"
         accessibilityState={{ expanded: openMenu === 'profile' }}
         onPress={() => setOpenMenu((current) => (current === 'profile' ? null : 'profile'))}
-        style={styles.avatarButton}
+        style={StyleSheet.flatten([styles.avatarButton, !avatarUrl && { backgroundColor: avatarColor }])}
       >
-        <Text style={styles.avatarText}>{initial}</Text>
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+        ) : (
+          <Text style={styles.avatarText}>{avatarInitials}</Text>
+        )}
       </Pressable>
     </View>
   );
@@ -339,7 +379,7 @@ function HeaderActions() {
 function BottomNavigation() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const [openMenu, setOpenMenu] = useState<'content' | 'meetings' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'content' | 'meetings' | 'users' | null>(null);
 
   const tokenQuery = useQuery({
     queryKey: ['auth-token'],
@@ -353,8 +393,12 @@ function BottomNavigation() {
   });
 
   const isLoggedIn = Boolean(tokenQuery.data && meQuery.data);
+  const isStudent = meQuery.data?.role === 'student';
+  const isTutor = meQuery.data?.role === 'tutor';
   const isContentActive = pathname.startsWith('/cursos') || pathname.startsWith('/biblia');
   const isMeetingsActive = pathname.startsWith('/reuniones') || pathname.startsWith('/chat');
+  const isPastoralActive = pathname.startsWith('/orientacion-pastoral');
+  const isUsersActive = pathname.startsWith('/usuarios');
 
   useEffect(() => {
     setOpenMenu(null);
@@ -379,6 +423,27 @@ function BottomNavigation() {
         <View style={[styles.dropdownMenu, styles.dropdownMenuRight, { bottom: menuBottom }]}>
           <DropdownItem icon={CalendarDays} label="Mis reuniones" onPress={() => router.push('/reuniones')} />
           <DropdownItem icon={MessageCircle} label="Chat" onPress={() => router.push('/chat')} />
+        </View>
+      ) : null}
+
+      {openMenu === 'users' ? (
+        <View style={[styles.dropdownMenu, styles.dropdownMenuRight, { bottom: menuBottom }]}>
+          <DropdownItem
+            icon={UserCog}
+            label="Listado de usuarios"
+            onPress={() => {
+              setOpenMenu(null);
+              router.push({ pathname: '/usuarios', params: { tab: 'students' } });
+            }}
+          />
+          <DropdownItem
+            icon={UsersRound}
+            label="Grupos"
+            onPress={() => {
+              setOpenMenu(null);
+              router.push({ pathname: '/usuarios', params: { tab: 'groups' } });
+            }}
+          />
         </View>
       ) : null}
 
@@ -413,6 +478,31 @@ function BottomNavigation() {
           <CalendarDays color={isMeetingsActive ? '#1b6fd7' : '#64748b'} size={22} strokeWidth={2.2} />
           <Text style={[styles.bottomNavText, isMeetingsActive && styles.bottomNavTextActive]}>Reuniones</Text>
         </Pressable>
+
+        {isStudent ? (
+          <Link href="/orientacion-pastoral" asChild>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityState={{ selected: isPastoralActive }}
+              style={StyleSheet.flatten([styles.bottomNavItem, isPastoralActive && styles.bottomNavItemActive])}
+            >
+              <HeartHandshake color={isPastoralActive ? '#1b6fd7' : '#64748b'} size={22} strokeWidth={2.2} />
+              <Text style={[styles.bottomNavText, isPastoralActive && styles.bottomNavTextActive]}>Orientacion</Text>
+            </Pressable>
+          </Link>
+        ) : null}
+
+        {isTutor ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: openMenu === 'users', selected: isUsersActive }}
+            onPress={() => setOpenMenu((current) => (current === 'users' ? null : 'users'))}
+            style={StyleSheet.flatten([styles.bottomNavItem, isUsersActive && styles.bottomNavItemActive])}
+          >
+            <UsersRound color={isUsersActive ? '#1b6fd7' : '#64748b'} size={22} strokeWidth={2.2} />
+            <Text style={[styles.bottomNavText, isUsersActive && styles.bottomNavTextActive]}>Usuarios</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -478,6 +568,14 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 36,
   },
+  headerBrandTitle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBrandLogo: {
+    height: 36,
+    width: 36,
+  },
   headerLoginButton: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -497,7 +595,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     height: 36,
     justifyContent: 'center',
+    overflow: 'hidden',
     width: 36,
+  },
+  avatarImage: {
+    height: '100%',
+    width: '100%',
   },
   avatarText: {
     color: '#ffffff',

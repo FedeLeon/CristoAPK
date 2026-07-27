@@ -1,7 +1,14 @@
+import { z } from 'zod';
 import { clearAuthToken, setAuthToken } from '../auth/tokenStorage';
 import { clearApiCache } from '../storage/localDb';
 import { extractApiData, loginResponseSchema, userSchema } from '../types/api';
 import { api } from './client';
+
+const registerResponseSchema = z.object({
+  message: z.string().optional(),
+  token: z.string().optional(),
+  user: userSchema,
+});
 
 export type ProfileUpdateInput = {
   name?: string;
@@ -23,6 +30,14 @@ export type ProfileUpdateInput = {
   };
 };
 
+export type RegisterInput = {
+  email: string;
+  name: string;
+  password: string;
+  password_confirmation: string;
+  role: 'student' | 'pastor';
+};
+
 export async function login(email: string, password: string) {
   const response = await api.post('/login', { email, password });
   const parsed = loginResponseSchema.parse(response.data);
@@ -30,6 +45,22 @@ export async function login(email: string, password: string) {
   await setAuthToken(parsed.token);
 
   return parsed.user;
+}
+
+export async function register(input: RegisterInput) {
+  const response = await api.post('/register', input);
+  const parsed = registerResponseSchema.parse(response.data);
+
+  if (parsed.token) {
+    await setAuthToken(parsed.token);
+  }
+
+  return parsed;
+}
+
+export async function forgotPassword(email: string) {
+  const response = await api.post('/olvide-mi-contrasena', { email });
+  return response.data as { message: string };
 }
 
 export async function logout() {

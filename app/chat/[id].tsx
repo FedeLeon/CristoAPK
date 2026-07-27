@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { me } from '../../src/api/auth';
 import { getChat, sendChatMessage } from '../../src/api/chats';
 import { getApiErrorMessage } from '../../src/api/client';
@@ -57,17 +57,16 @@ export default function ChatDetailScreen() {
 
   return (
     <View style={styles.screen}>
+      <View style={styles.header}>
+        <ScreenTitle icon="chat" text={chatQuery.data?.title ?? 'Chat'} />
+        <Text style={styles.muted}>{chatQuery.data?.type === 'group' ? 'Conversacion grupal' : 'Conversacion directa'}</Text>
+      </View>
+
       <FlatList
         contentContainerStyle={styles.list}
         data={[...(chatQuery.data?.messages ?? [])].reverse()}
         inverted
         keyExtractor={(item) => String(item.id)}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <ScreenTitle icon="chat" text={chatQuery.data?.title ?? 'Chat'} />
-            <Text style={styles.muted}>{chatQuery.data?.type === 'group' ? 'Conversacion grupal' : 'Conversacion directa'}</Text>
-          </View>
-        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.muted}>Todavia no hay mensajes.</Text>
@@ -75,16 +74,30 @@ export default function ChatDetailScreen() {
         }
         renderItem={({ item }) => {
           const isMine = item.user?.id === meQuery.data?.id;
+          const avatarUrl = item.user?.avatar_url;
+          const avatarInitials = item.user?.avatar_initials || item.user?.name?.trim()?.charAt(0)?.toUpperCase() || 'U';
+          const avatarColor = item.user?.avatar_color || '#12365c';
 
           return (
             <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}>
-              <Text style={[styles.messageAuthor, isMine ? styles.messageAuthorMine : styles.messageAuthorOther]}>
-                {isMine ? 'Vos' : item.user?.name ?? 'Usuario'}
-              </Text>
-              <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
-                <Text style={[styles.messageBody, isMine ? styles.messageBodyMine : styles.messageBodyOther]}>
-                  {item.body}
-                </Text>
+              <View style={[styles.messageContentRow, isMine && styles.messageContentRowMine]}>
+                <View style={[styles.messageAvatar, !avatarUrl && { backgroundColor: avatarColor }]}>
+                  {avatarUrl ? (
+                    <Image source={{ uri: avatarUrl }} style={styles.messageAvatarImage} />
+                  ) : (
+                    <Text style={styles.messageAvatarText}>{avatarInitials}</Text>
+                  )}
+                </View>
+                <View style={styles.messageContent}>
+                  <Text style={[styles.messageAuthor, isMine ? styles.messageAuthorMine : styles.messageAuthorOther]}>
+                    {isMine ? 'Vos' : item.user?.name ?? 'Usuario'}
+                  </Text>
+                  <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
+                    <Text style={[styles.messageBody, isMine ? styles.messageBodyMine : styles.messageBodyOther]}>
+                      {item.body}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </View>
           );
@@ -131,11 +144,15 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   list: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   header: {
+    backgroundColor: '#f6f7fb',
+    borderBottomColor: '#dce2ea',
+    borderBottomWidth: 1,
     gap: 5,
-    paddingBottom: 6,
+    padding: 16,
   },
   title: {
     color: '#151922',
@@ -160,15 +177,43 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   messageRow: {
-    gap: 4,
     marginVertical: 6,
-    maxWidth: '82%',
+    maxWidth: '92%',
   },
   messageRowMine: {
     alignSelf: 'flex-end',
   },
   messageRowOther: {
     alignSelf: 'flex-start',
+  },
+  messageContentRow: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 7,
+  },
+  messageContentRowMine: {
+    flexDirection: 'row-reverse',
+  },
+  messageAvatar: {
+    alignItems: 'center',
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 32,
+  },
+  messageAvatarImage: {
+    height: '100%',
+    width: '100%',
+  },
+  messageAvatarText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  messageContent: {
+    flexShrink: 1,
+    gap: 4,
   },
   messageAuthor: {
     fontSize: 13,

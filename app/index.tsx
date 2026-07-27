@@ -98,10 +98,34 @@ export default function HomeScreen() {
       style={styles.scrollView}
       contentContainerStyle={StyleSheet.flatten([styles.container, !isLoggedIn && styles.containerCentered])}
     >
+      {isLoggedIn && shouldShowProfilePrompt(meQuery.data) ? (
+        <View style={styles.profilePrompt}>
+          <View style={styles.blockHeader}>
+            <View style={styles.profilePromptIcon}>
+              <IdCard color="#9a3412" size={21} strokeWidth={2.2} />
+            </View>
+            <View style={styles.blockHeaderText}>
+              <Text style={styles.profilePromptEyebrow}>Perfil pendiente</Text>
+              <Text style={styles.blockTitle}>Completa tu perfil</Text>
+            </View>
+          </View>
+          <Text style={styles.blockMeta}>
+            Completa tus datos personales y sube una imagen de perfil para dejar de ver este aviso.
+          </Text>
+          {meQuery.data?.missing_profile_fields?.length ? (
+            <Text numberOfLines={2} style={styles.profilePromptMissing}>
+              Falta: {meQuery.data.missing_profile_fields.map((field) => field.label).join(', ')}
+            </Text>
+          ) : null}
+          <Pressable style={styles.profilePromptButton} onPress={() => router.push('/perfil')}>
+            <Text style={styles.profilePromptButtonText}>Ir al perfil</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <View style={styles.brandPanel}>
         <Image source={require('../assets/brand/mds-dove-black.png')} style={styles.logo} />
-        <Text style={styles.roleBadge}>{dashboard.label}</Text>
-        <ScreenTitle icon="home" text={isLoggedIn ? dashboard.title : 'Bienvenido a MDS'} />
+        <Text style={styles.heroTitle}>{isLoggedIn ? dashboard.title : 'Bienvenido a MDS'}</Text>
         <Text style={styles.subtitle}>{isLoggedIn ? dashboard.message : 'Mensaje de salvacion'}</Text>
         {tokenQuery.isLoading || meQuery.isLoading ? (
           <View style={styles.sessionRow}>
@@ -110,40 +134,10 @@ export default function HomeScreen() {
           </View>
         ) : null}
         {meQuery.isError ? <Text style={styles.error}>{getApiErrorMessage(meQuery.error)}</Text> : null}
-        {isLoggedIn ? (
-          <Text style={styles.sessionText}>
-            {meQuery.data?.name} - {meQuery.data?.email}
-          </Text>
-        ) : null}
       </View>
 
       {isLoggedIn ? (
         <>
-          {shouldShowProfilePrompt(meQuery.data) ? (
-            <View style={styles.profilePrompt}>
-              <View style={styles.blockHeader}>
-                <View style={styles.profilePromptIcon}>
-                  <IdCard color="#9a3412" size={21} strokeWidth={2.2} />
-                </View>
-                <View style={styles.blockHeaderText}>
-                  <Text style={styles.profilePromptEyebrow}>Perfil pendiente</Text>
-                  <Text style={styles.blockTitle}>Completa tu perfil</Text>
-                </View>
-              </View>
-              <Text style={styles.blockMeta}>
-                Completa tus datos personales y sube una imagen de perfil para dejar de ver este aviso.
-              </Text>
-              {meQuery.data?.missing_profile_fields?.length ? (
-                <Text numberOfLines={2} style={styles.profilePromptMissing}>
-                  Falta: {meQuery.data.missing_profile_fields.map((field) => field.label).join(', ')}
-                </Text>
-              ) : null}
-              <Pressable style={styles.profilePromptButton} onPress={() => router.push('/perfil')}>
-                <Text style={styles.profilePromptButtonText}>Ir al perfil</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
           {isStudent ? (
             <StudentDashboardBlocks
               data={dashboardQuery.data}
@@ -366,21 +360,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
+  heroTitle: {
+    color: '#151922',
+    fontSize: 30,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
   subtitle: {
     color: '#516070',
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
-  },
-  roleBadge: {
-    backgroundColor: '#e8f1ff',
-    borderRadius: 8,
-    color: '#1b4f91',
-    fontSize: 13,
-    fontWeight: '800',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    textTransform: 'uppercase',
   },
   sessionRow: {
     alignItems: 'center',
@@ -457,6 +447,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
+    marginBottom: 14,
     marginTop: 14,
     padding: 16,
     width: '100%',

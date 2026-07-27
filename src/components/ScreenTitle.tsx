@@ -4,10 +4,12 @@ import {
   CalendarDays,
   CircleUserRound,
   GraduationCap,
+  HeartHandshake,
   Home,
   LogIn,
   Megaphone,
   MessageCircle,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
@@ -22,7 +24,9 @@ export type ScreenTitleIcon =
   | 'login'
   | 'meetings'
   | 'notifications'
-  | 'profile';
+  | 'pastoral'
+  | 'profile'
+  | 'users';
 
 const iconMap: Record<ScreenTitleIcon, LucideIcon> = {
   announcements: Megaphone,
@@ -34,7 +38,9 @@ const iconMap: Record<ScreenTitleIcon, LucideIcon> = {
   login: LogIn,
   meetings: CalendarDays,
   notifications: Bell,
+  pastoral: HeartHandshake,
   profile: CircleUserRound,
+  users: UsersRound,
 };
 
 export function ScreenTitle({
