@@ -1,11 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { BookOpen, CalendarDays, GraduationCap, MessageCircle } from 'lucide-react-native';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  GraduationCap,
+  IdCard,
+  Megaphone,
+  MessageCircle,
+  Quote,
+} from 'lucide-react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { me } from '../src/api/auth';
 import { getApiErrorMessage } from '../src/api/client';
+import { getDashboard, markDashboardAnnouncementRead } from '../src/api/dashboard';
 import { getAuthToken } from '../src/auth/tokenStorage';
-import { ApiUser } from '../src/types/api';
+import { ScreenTitle } from '../src/components/ScreenTitle';
+import { ApiUser, DashboardAnnouncement } from '../src/types/api';
 
 function getRoleDashboard(user?: ApiUser) {
   if (!user) {
@@ -39,7 +51,16 @@ function getRoleDashboard(user?: ApiUser) {
   };
 }
 
+function shouldShowProfilePrompt(user?: ApiUser) {
+  if (!user?.profile_completion_required) {
+    return false;
+  }
+
+  return user.profile_complete === false;
+}
+
 export default function HomeScreen() {
+  const queryClient = useQueryClient();
   const tokenQuery = useQuery({
     queryKey: ['auth-token'],
     queryFn: getAuthToken,
@@ -52,7 +73,19 @@ export default function HomeScreen() {
   });
 
   const isLoggedIn = Boolean(tokenQuery.data && meQuery.data);
+  const isStudent = meQuery.data?.role === 'student';
   const dashboard = getRoleDashboard(meQuery.data);
+  const dashboardQuery = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: getDashboard,
+    enabled: Boolean(isLoggedIn && isStudent),
+  });
+  const markAnnouncementReadMutation = useMutation({
+    mutationFn: markDashboardAnnouncementRead,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
   const quickActions = [
     { icon: GraduationCap, label: 'Contenido general', route: '/cursos' },
     { icon: BookOpen, label: 'Biblia', route: '/biblia' },
@@ -61,11 +94,14 @@ export default function HomeScreen() {
   ] as const;
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={StyleSheet.flatten([styles.container, !isLoggedIn && styles.containerCentered])}
+    >
       <View style={styles.brandPanel}>
         <Image source={require('../assets/brand/mds-dove-black.png')} style={styles.logo} />
         <Text style={styles.roleBadge}>{dashboard.label}</Text>
-        <Text style={styles.title}>{isLoggedIn ? dashboard.title : 'Bienvenido a MDS'}</Text>
+        <ScreenTitle icon="home" text={isLoggedIn ? dashboard.title : 'Bienvenido a MDS'} />
         <Text style={styles.subtitle}>{isLoggedIn ? dashboard.message : 'Mensaje de salvacion'}</Text>
         {tokenQuery.isLoading || meQuery.isLoading ? (
           <View style={styles.sessionRow}>
@@ -82,34 +118,230 @@ export default function HomeScreen() {
       </View>
 
       {isLoggedIn ? (
-        <View style={styles.quickGrid}>
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-
-            return (
-              <Pressable key={action.route} style={styles.quickButton} onPress={() => router.push(action.route)}>
-                <Icon color="#1b6fd7" size={28} strokeWidth={2.1} />
-                <Text style={styles.quickButtonText}>{action.label}</Text>
+        <>
+          {shouldShowProfilePrompt(meQuery.data) ? (
+            <View style={styles.profilePrompt}>
+              <View style={styles.blockHeader}>
+                <View style={styles.profilePromptIcon}>
+                  <IdCard color="#9a3412" size={21} strokeWidth={2.2} />
+                </View>
+                <View style={styles.blockHeaderText}>
+                  <Text style={styles.profilePromptEyebrow}>Perfil pendiente</Text>
+                  <Text style={styles.blockTitle}>Completa tu perfil</Text>
+                </View>
+              </View>
+              <Text style={styles.blockMeta}>
+                Completa tus datos personales y sube una imagen de perfil para dejar de ver este aviso.
+              </Text>
+              {meQuery.data?.missing_profile_fields?.length ? (
+                <Text numberOfLines={2} style={styles.profilePromptMissing}>
+                  Falta: {meQuery.data.missing_profile_fields.map((field) => field.label).join(', ')}
+                </Text>
+              ) : null}
+              <Pressable style={styles.profilePromptButton} onPress={() => router.push('/perfil')}>
+                <Text style={styles.profilePromptButtonText}>Ir al perfil</Text>
               </Pressable>
-            );
-          })}
-        </View>
+            </View>
+          ) : null}
+
+          {isStudent ? (
+            <StudentDashboardBlocks
+              data={dashboardQuery.data}
+              error={dashboardQuery.error}
+              isError={dashboardQuery.isError}
+              isLoading={dashboardQuery.isLoading}
+              markReadId={markAnnouncementReadMutation.variables}
+              onMarkRead={(id) => markAnnouncementReadMutation.mutate(id)}
+            />
+          ) : null}
+
+          <View style={styles.quickGrid}>
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+
+              return (
+                <Pressable key={action.route} style={styles.quickButton} onPress={() => router.push(action.route)}>
+                  <Icon color="#1b6fd7" size={28} strokeWidth={2.1} />
+                  <Text style={styles.quickButtonText}>{action.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
       ) : (
         <Pressable style={styles.primaryButton} onPress={() => router.push('/login')}>
           <Text style={styles.primaryButtonText}>Ingresar</Text>
         </Pressable>
       )}
+    </ScrollView>
+  );
+}
+
+function StudentDashboardBlocks({
+  data,
+  error,
+  isError,
+  isLoading,
+  markReadId,
+  onMarkRead,
+}: {
+  data?: Awaited<ReturnType<typeof getDashboard>>;
+  error: unknown;
+  isError: boolean;
+  isLoading: boolean;
+  markReadId?: number;
+  onMarkRead: (id: number) => void;
+}) {
+  if (isLoading) {
+    return (
+      <View style={styles.dashboardBlock}>
+        <ActivityIndicator />
+        <Text style={styles.sessionText}>Cargando novedades...</Text>
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View style={styles.dashboardBlock}>
+        <ScreenTitle icon="home" size="medium" text="No se pudo cargar el dashboard" />
+        <Text style={styles.error}>{getApiErrorMessage(error)}</Text>
+      </View>
+    );
+  }
+
+  const unreadAnnouncements = data?.announcements.data.filter((announcement) => !announcement.is_read) ?? [];
+
+  return (
+    <>
+      {data?.daily_verse ? (
+        <View style={styles.dashboardBlock}>
+          <View style={styles.blockHeader}>
+            <View style={styles.blockIcon}>
+              <Quote color="#1b6fd7" size={21} strokeWidth={2.2} />
+            </View>
+            <View style={styles.blockHeaderText}>
+              <Text style={styles.blockEyebrow}>Versiculo del dia</Text>
+              <Text style={styles.blockTitle}>{data.daily_verse.reference}</Text>
+            </View>
+          </View>
+          <Text style={styles.verseText}>{data.daily_verse.text}</Text>
+          <Text style={styles.blockMeta}>{data.daily_verse.version}</Text>
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() =>
+              router.push({
+                pathname: '/biblia',
+                params: {
+                  book: String(data.daily_verse?.book.id),
+                  chapter: String(data.daily_verse?.chapter.number),
+                },
+              })
+            }
+          >
+            <Text style={styles.secondaryButtonText}>Leer capitulo</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      <View style={styles.dashboardBlock}>
+        <View style={styles.blockHeader}>
+          <View style={styles.blockIcon}>
+            <Megaphone color="#1b6fd7" size={21} strokeWidth={2.2} />
+          </View>
+          <View style={styles.blockHeaderText}>
+            <Text style={styles.blockEyebrow}>Anuncios</Text>
+            <Text style={styles.blockTitle}>Avisos generales y de tu tutor</Text>
+          </View>
+          {data?.announcements.unread_count ? (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{data.announcements.unread_count}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {unreadAnnouncements.length ? (
+          <View style={styles.announcementList}>
+            {unreadAnnouncements.slice(0, 3).map((announcement) => (
+              <AnnouncementCard
+                announcement={announcement}
+                isMarkingRead={markReadId === announcement.id}
+                key={announcement.id}
+                onMarkRead={onMarkRead}
+              />
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.blockMeta}>No hay anuncios pendientes.</Text>
+        )}
+
+        <Pressable style={styles.secondaryButton} onPress={() => router.push('/anuncios')}>
+          <Text style={styles.secondaryButtonText}>Ver todos los anuncios</Text>
+        </Pressable>
+      </View>
+    </>
+  );
+}
+
+function AnnouncementCard({
+  announcement,
+  isMarkingRead,
+  onMarkRead,
+}: {
+  announcement: DashboardAnnouncement;
+  isMarkingRead: boolean;
+  onMarkRead: (id: number) => void;
+}) {
+  return (
+    <View style={StyleSheet.flatten([styles.announcementCard, !announcement.is_read && styles.announcementCardUnread])}>
+      <Pressable style={styles.announcementOpenArea} onPress={() => router.push(`/anuncios/${announcement.id}`)}>
+        <View style={styles.announcementTitleRow}>
+          <Text style={styles.announcementTitle}>{announcement.title}</Text>
+          <Text
+            style={StyleSheet.flatten([
+              styles.statusPill,
+              announcement.is_read ? styles.statusPillRead : styles.statusPillNew,
+            ])}
+          >
+            {announcement.is_read ? 'Leido' : 'Nuevo'}
+          </Text>
+        </View>
+        <Text style={styles.blockMeta}>
+          {announcement.source_name} - {announcement.audience_label}
+        </Text>
+        <View style={styles.announcementReadMore}>
+          <Text style={styles.announcementReadMoreText}>Abrir detalle</Text>
+          <ChevronRight color="#1b6fd7" size={16} strokeWidth={2.4} />
+        </View>
+      </Pressable>
+      {!announcement.is_read ? (
+        <Pressable
+          disabled={isMarkingRead}
+          style={StyleSheet.flatten([styles.inlineAction, isMarkingRead && styles.inlineActionDisabled])}
+          onPress={() => onMarkRead(announcement.id)}
+        >
+          <CheckCircle2 color="#1b6fd7" size={17} strokeWidth={2.2} />
+          <Text style={styles.inlineActionText}>{isMarkingRead ? 'Marcando...' : 'Marcar como leido'}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scrollView: {
+    backgroundColor: '#f6f7fb',
     flex: 1,
+  },
+  container: {
     alignItems: 'center',
     backgroundColor: '#f6f7fb',
-    justifyContent: 'center',
     padding: 28,
+    paddingBottom: 112,
+  },
+  containerCentered: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   brandPanel: {
     alignItems: 'center',
@@ -208,5 +440,209 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '800',
+  },
+  dashboardBlock: {
+    backgroundColor: '#ffffff',
+    borderColor: '#dce2ea',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    marginTop: 14,
+    padding: 16,
+    width: '100%',
+  },
+  profilePrompt: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fed7aa',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    marginTop: 14,
+    padding: 16,
+    width: '100%',
+  },
+  profilePromptIcon: {
+    alignItems: 'center',
+    backgroundColor: '#ffedd5',
+    borderRadius: 8,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  profilePromptEyebrow: {
+    color: '#c2410c',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  profilePromptMissing: {
+    color: '#9a3412',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+  },
+  profilePromptButton: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#fdba74',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+  },
+  profilePromptButtonText: {
+    color: '#9a3412',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  blockHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  blockIcon: {
+    alignItems: 'center',
+    backgroundColor: '#e8f1ff',
+    borderRadius: 8,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  blockHeaderText: {
+    flex: 1,
+    gap: 2,
+  },
+  blockEyebrow: {
+    color: '#1b6fd7',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  blockTitle: {
+    color: '#151922',
+    fontSize: 17,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
+  verseText: {
+    color: '#2f3947',
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 28,
+  },
+  blockMeta: {
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    borderColor: '#c3cfdd',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+  },
+  secondaryButtonText: {
+    color: '#151922',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  unreadBadge: {
+    alignItems: 'center',
+    backgroundColor: '#b42318',
+    borderRadius: 10,
+    minWidth: 24,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  unreadBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  announcementList: {
+    gap: 10,
+  },
+  announcementCard: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  announcementOpenArea: {
+    gap: 8,
+  },
+  announcementCardUnread: {
+    backgroundColor: '#f7fbff',
+    borderColor: '#9ec5fe',
+  },
+  announcementTitleRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  announcementTitle: {
+    color: '#151922',
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 20,
+  },
+  statusPill: {
+    borderRadius: 8,
+    fontSize: 11,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  statusPillNew: {
+    backgroundColor: '#fff4d6',
+    color: '#8a5a00',
+  },
+  statusPillRead: {
+    backgroundColor: '#e8f1ff',
+    color: '#1b4f91',
+  },
+  announcementImage: {
+    backgroundColor: '#e2e8f0',
+    borderRadius: 8,
+    height: 128,
+    width: '100%',
+  },
+  announcementBody: {
+    color: '#42526a',
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  announcementReadMore: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  announcementReadMoreText: {
+    color: '#1b6fd7',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  inlineAction: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  inlineActionDisabled: {
+    opacity: 0.6,
+  },
+  inlineActionText: {
+    color: '#1b6fd7',
+    fontSize: 13,
+    fontWeight: '900',
   },
 });

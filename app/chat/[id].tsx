@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, Vi
 import { me } from '../../src/api/auth';
 import { getChat, sendChatMessage } from '../../src/api/chats';
 import { getApiErrorMessage } from '../../src/api/client';
+import { ScreenTitle } from '../../src/components/ScreenTitle';
 
 export default function ChatDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,7 +46,7 @@ export default function ChatDetailScreen() {
 
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>No se pudo cargar el chat</Text>
+        <ScreenTitle icon="chat" text="No se pudo cargar el chat" />
         <Text style={styles.error}>{getApiErrorMessage(error)}</Text>
         <Pressable style={styles.secondaryButton} onPress={() => chatQuery.refetch()}>
           <Text style={styles.secondaryButtonText}>Reintentar</Text>
@@ -63,7 +64,7 @@ export default function ChatDetailScreen() {
         keyExtractor={(item) => String(item.id)}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>{chatQuery.data?.title ?? 'Chat'}</Text>
+            <ScreenTitle icon="chat" text={chatQuery.data?.title ?? 'Chat'} />
             <Text style={styles.muted}>{chatQuery.data?.type === 'group' ? 'Conversacion grupal' : 'Conversacion directa'}</Text>
           </View>
         }

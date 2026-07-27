@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getApiErrorMessage } from '../src/api/client';
 import { getMeetings } from '../src/api/meetings';
+import { ScreenTitle } from '../src/components/ScreenTitle';
 
 function formatMeetingDate(value?: string | null) {
   if (!value) {
@@ -32,7 +34,7 @@ export default function MeetingsScreen() {
   if (meetingsQuery.isError) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>No se pudieron cargar tus reuniones</Text>
+        <ScreenTitle icon="meetings" text="No se pudieron cargar tus reuniones" />
         <Text style={styles.error}>{getApiErrorMessage(meetingsQuery.error)}</Text>
         <Pressable style={styles.secondaryButton} onPress={() => meetingsQuery.refetch()}>
           <Text style={styles.secondaryButtonText}>Reintentar</Text>
@@ -44,7 +46,7 @@ export default function MeetingsScreen() {
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <View style={styles.header}>
-        <Text style={styles.title}>Mis reuniones</Text>
+        <ScreenTitle icon="meetings" text="Mis reuniones" />
         <Text style={styles.muted}>Reuniones programadas para tu usuario.</Text>
       </View>
 
@@ -60,7 +62,7 @@ export default function MeetingsScreen() {
             </View>
             {meeting.teacher?.name ? <Text style={styles.meta}>Tutor: {meeting.teacher.name}</Text> : null}
             {meeting.jitsi_room_url ? (
-              <Pressable style={styles.primaryButton} onPress={() => Linking.openURL(meeting.jitsi_room_url!)}>
+              <Pressable style={styles.primaryButton} onPress={() => router.push(`/reuniones/${meeting.id}`)}>
                 <Text style={styles.primaryButtonText}>Entrar a la reunion</Text>
               </Pressable>
             ) : null}

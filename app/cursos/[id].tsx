@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getApiErrorMessage } from '../../src/api/client';
 import { getCourse } from '../../src/api/courses';
+import { ScreenTitle } from '../../src/components/ScreenTitle';
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,7 +26,7 @@ export default function CourseDetailScreen() {
   if (courseQuery.isError) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>No se pudo cargar el contenido</Text>
+        <ScreenTitle icon="content" text="No se pudo cargar el contenido" />
         <Text style={styles.error}>{getApiErrorMessage(courseQuery.error)}</Text>
         <Pressable style={styles.secondaryButton} onPress={() => courseQuery.refetch()}>
           <Text style={styles.secondaryButtonText}>Reintentar</Text>
@@ -51,7 +52,7 @@ export default function CourseDetailScreen() {
 
       <View style={styles.container}>
         <Text style={styles.eyebrow}>Contenido #{course?.id}</Text>
-        <Text style={styles.title}>{course?.title ?? course?.name ?? 'Contenido'}</Text>
+        <ScreenTitle icon="content" text={course?.title ?? course?.name ?? 'Contenido'} />
         {course?.subtitle ? <Text style={styles.subtitle}>{course.subtitle}</Text> : null}
         {course?.description ? <Text style={styles.text}>{course.description}</Text> : null}
 
@@ -76,6 +77,47 @@ export default function CourseDetailScreen() {
         </View>
 
         {course?.teacher?.name ? <Text style={styles.teacher}>Tutor: {course.teacher.name}</Text> : null}
+
+        <View style={styles.structureBlock}>
+          <ScreenTitle icon="lesson" size="medium" text="Modulos y lecciones" />
+          {course?.modules?.length ? (
+            course.modules.map((module, moduleIndex) => (
+              <View key={module.id} style={styles.moduleCard}>
+                <Text style={styles.moduleEyebrow}>Modulo {moduleIndex + 1}</Text>
+                <Text style={styles.moduleTitle}>{module.title}</Text>
+                {module.description ? <Text style={styles.moduleDescription}>{module.description}</Text> : null}
+
+                <View style={styles.lessonList}>
+                  {module.lessons?.length ? (
+                    module.lessons.map((lesson, lessonIndex) => (
+                      <Pressable
+                        key={lesson.id}
+                        onPress={() => router.push(`/cursos/${course.id}/lecciones/${lesson.id}`)}
+                        style={styles.lessonButton}
+                      >
+                        <View style={styles.lessonNumber}>
+                          <Text style={styles.lessonNumberText}>{lessonIndex + 1}</Text>
+                        </View>
+                        <View style={styles.lessonTextBlock}>
+                          <Text style={styles.lessonTitle}>{lesson.title}</Text>
+                          <Text style={styles.lessonMeta}>
+                            {lesson.contents?.length ?? 0} materiales
+                          </Text>
+                        </View>
+                      </Pressable>
+                    ))
+                  ) : (
+                    <Text style={styles.muted}>Este modulo no tiene lecciones.</Text>
+                  )}
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyStructure}>
+              <Text style={styles.muted}>Este contenido todavia no tiene modulos cargados.</Text>
+            </View>
+          )}
+        </View>
       </View>
     </ScrollView>
   );
@@ -227,6 +269,86 @@ const styles = StyleSheet.create({
     color: '#516070',
     fontSize: 14,
     fontWeight: '700',
+  },
+  structureBlock: {
+    gap: 12,
+    marginTop: 4,
+  },
+  sectionTitle: {
+    color: '#151922',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  moduleCard: {
+    backgroundColor: '#ffffff',
+    borderColor: '#dce2ea',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+  },
+  moduleEyebrow: {
+    color: '#1b6fd7',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  moduleTitle: {
+    color: '#151922',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  moduleDescription: {
+    color: '#516070',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  lessonList: {
+    gap: 8,
+  },
+  lessonButton: {
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 10,
+  },
+  lessonNumber: {
+    alignItems: 'center',
+    backgroundColor: '#e8f1ff',
+    borderRadius: 8,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  lessonNumberText: {
+    color: '#1b6fd7',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  lessonTextBlock: {
+    flex: 1,
+    gap: 2,
+  },
+  lessonTitle: {
+    color: '#2f3947',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  lessonMeta: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  emptyStructure: {
+    backgroundColor: '#ffffff',
+    borderColor: '#dce2ea',
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 14,
   },
   secondaryButton: {
     alignItems: 'center',

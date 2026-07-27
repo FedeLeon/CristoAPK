@@ -9,15 +9,17 @@ import {
   LogIn,
   LogOut,
   MessageCircle,
+  ArrowLeft,
 } from 'lucide-react-native';
 import { Link, router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logout, me } from '../src/api/auth';
 import { getNotifications, markNotificationsRead } from '../src/api/notifications';
 import { getAuthToken } from '../src/auth/tokenStorage';
+import { ScreenTitle, ScreenTitleIcon } from '../src/components/ScreenTitle';
 
 export default function RootLayout() {
   const [queryClient] = useState(
@@ -36,13 +38,15 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <View style={styles.shell}>
+          <LogicalAndroidBackHandler />
           <StatusBar hidden={false} style="dark" />
           <View style={styles.stackArea}>
             <Stack
               screenOptions={{
+                headerLeft: () => <HeaderBackButton />,
                 headerRight: () => <HeaderActions />,
+                headerTitle: () => <AppHeaderTitle />,
                 headerStyle: { backgroundColor: '#ffffff' },
-                headerTitleStyle: { fontWeight: '700' },
                 headerShadowVisible: false,
                 contentStyle: { backgroundColor: '#f6f7fb' },
               }}
@@ -50,10 +54,14 @@ export default function RootLayout() {
               <Stack.Screen name="index" options={{ headerBackVisible: false, title: 'MDS' }} />
               <Stack.Screen name="login" options={{ title: 'Ingresar' }} />
               <Stack.Screen name="perfil" options={{ title: 'Mi perfil' }} />
+              <Stack.Screen name="anuncios/index" options={{ title: 'Anuncios' }} />
+              <Stack.Screen name="anuncios/[id]" options={{ title: 'Anuncio' }} />
               <Stack.Screen name="cursos/index" options={{ title: 'Contenido' }} />
               <Stack.Screen name="cursos/[id]" options={{ title: 'Contenido' }} />
+              <Stack.Screen name="cursos/[id]/lecciones/[lessonId]" options={{ title: 'Leccion' }} />
               <Stack.Screen name="biblia/index" options={{ title: 'Biblia' }} />
               <Stack.Screen name="reuniones" options={{ title: 'Mis reuniones' }} />
+              <Stack.Screen name="reuniones/[id]" options={{ title: 'Reunion' }} />
               <Stack.Screen name="chat/index" options={{ title: 'Chat' }} />
               <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
             </Stack>
@@ -62,6 +70,134 @@ export default function RootLayout() {
         </View>
       </SafeAreaProvider>
     </QueryClientProvider>
+  );
+}
+
+function getHeaderTitle(pathname: string): { icon: ScreenTitleIcon; text: string } {
+  if (pathname === '/login') {
+    return { icon: 'login', text: 'Ingresar' };
+  }
+
+  if (pathname === '/perfil') {
+    return { icon: 'profile', text: 'Mi perfil' };
+  }
+
+  if (pathname.startsWith('/anuncios')) {
+    return { icon: 'announcements', text: pathname === '/anuncios' ? 'Anuncios' : 'Anuncio' };
+  }
+
+  if (pathname.startsWith('/cursos/') && pathname.includes('/lecciones/')) {
+    return { icon: 'lesson', text: 'Leccion' };
+  }
+
+  if (pathname.startsWith('/cursos')) {
+    return { icon: 'content', text: 'Contenido' };
+  }
+
+  if (pathname.startsWith('/biblia')) {
+    return { icon: 'bible', text: 'Biblia' };
+  }
+
+  if (pathname.startsWith('/reuniones/')) {
+    return { icon: 'meetings', text: 'Reunion' };
+  }
+
+  if (pathname.startsWith('/reuniones')) {
+    return { icon: 'meetings', text: 'Mis reuniones' };
+  }
+
+  if (pathname.startsWith('/chat')) {
+    return { icon: 'chat', text: 'Chat' };
+  }
+
+  return { icon: 'home', text: 'MDS' };
+}
+
+function AppHeaderTitle() {
+  const pathname = usePathname();
+  const title = getHeaderTitle(pathname);
+
+  return <ScreenTitle icon={title.icon} size="small" text={title.text} />;
+}
+
+function getParentRoute(pathname: string) {
+  if (pathname === '/' || pathname === '/login') {
+    return null;
+  }
+
+  if (pathname === '/perfil' || pathname === '/anuncios' || pathname === '/cursos' || pathname === '/biblia') {
+    return '/';
+  }
+
+  if (pathname === '/reuniones' || pathname === '/chat') {
+    return '/';
+  }
+
+  if (pathname.startsWith('/anuncios/')) {
+    return '/anuncios';
+  }
+
+  if (pathname.startsWith('/reuniones/')) {
+    return '/reuniones';
+  }
+
+  if (pathname.startsWith('/chat/')) {
+    return '/chat';
+  }
+
+  const lessonMatch = pathname.match(/^\/cursos\/([^/]+)\/lecciones\/[^/]+$/);
+  if (lessonMatch) {
+    return `/cursos/${lessonMatch[1]}`;
+  }
+
+  if (pathname.startsWith('/cursos/')) {
+    return '/cursos';
+  }
+
+  return '/';
+}
+
+function LogicalAndroidBackHandler() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return undefined;
+    }
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      const parentRoute = getParentRoute(pathname);
+
+      if (parentRoute) {
+        router.replace(parentRoute);
+      }
+
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [pathname]);
+
+  return null;
+}
+
+function HeaderBackButton() {
+  const pathname = usePathname();
+  const parentRoute = getParentRoute(pathname);
+
+  if (!parentRoute) {
+    return null;
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel="Volver"
+      accessibilityRole="button"
+      onPress={() => router.replace(parentRoute)}
+      style={styles.headerBackButton}
+    >
+      <ArrowLeft color="#1f2937" size={22} strokeWidth={2.3} />
+    </Pressable>
   );
 }
 
@@ -319,6 +455,14 @@ const styles = StyleSheet.create({
   },
   stackArea: {
     flex: 1,
+  },
+  headerBackButton: {
+    alignItems: 'center',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    marginLeft: 4,
+    width: 36,
   },
   headerActions: {
     alignItems: 'center',

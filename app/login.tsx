@@ -6,6 +6,7 @@ import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput,
 import { login } from '../src/api/auth';
 import { getApiErrorMessage } from '../src/api/client';
 import { clearRememberedEmail, getRememberedEmail, setRememberedEmail } from '../src/auth/rememberedEmailStorage';
+import { ScreenTitle } from '../src/components/ScreenTitle';
 
 export default function LoginScreen() {
   const queryClient = useQueryClient();
@@ -60,7 +61,7 @@ export default function LoginScreen() {
       style={styles.screen}
     >
       <View style={styles.panel}>
-        <Text style={styles.title}>Ingresar</Text>
+        <ScreenTitle icon="login" text="Ingresar" />
         <Text style={styles.text}>Ingresa con el email y la contraseña de tu rol.</Text>
 
         <View style={styles.field}>

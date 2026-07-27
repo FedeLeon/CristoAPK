@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { getCourses } from '../../src/api/courses';
 import { getApiErrorMessage } from '../../src/api/client';
+import { ScreenTitle } from '../../src/components/ScreenTitle';
 
 export default function CoursesScreen() {
   const coursesQuery = useQuery({
@@ -22,7 +23,7 @@ export default function CoursesScreen() {
   if (coursesQuery.isError) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>No se pudo cargar el contenido</Text>
+        <ScreenTitle icon="content" text="No se pudo cargar el contenido" />
         <Text style={styles.error}>{getApiErrorMessage(coursesQuery.error)}</Text>
         <Pressable style={styles.secondaryButton} onPress={() => coursesQuery.refetch()}>
           <Text style={styles.secondaryButtonText}>Reintentar</Text>
@@ -41,13 +42,13 @@ export default function CoursesScreen() {
       }
       ListHeaderComponent={
         <View style={styles.header}>
-          <Text style={styles.title}>Contenido</Text>
+          <ScreenTitle icon="content" text="Contenido" />
           <Text style={styles.muted}>Contenidos de ayuda disponibles para seguir desde la APK.</Text>
         </View>
       }
       ListEmptyComponent={
         <View style={styles.empty}>
-          <Text style={styles.title}>Sin contenido</Text>
+          <ScreenTitle icon="content" text="Sin contenido" />
           <Text style={styles.muted}>La API respondio correctamente, pero no devolvio contenidos.</Text>
         </View>
       }
@@ -106,6 +107,7 @@ export default function CoursesScreen() {
           </Link>
         );
       }}
+      style={styles.screen}
     />
   );
 }
@@ -122,6 +124,9 @@ function MetaItem({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: '#f1f5f9',
+  },
   center: {
     flex: 1,
     alignItems: 'center',
