@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { extractApiData, tutorGroupSchema, tutorStudentSchema, tutorUsersResponseSchema } from '../types/api';
+import {
+  extractApiData,
+  tutorGroupSchema,
+  tutorPastoralAnalysisResponseSchema,
+  tutorStudentSchema,
+  tutorUsersResponseSchema,
+} from '../types/api';
 import { api } from './client';
 
 const tutorStudentsResponseSchema = z.array(tutorStudentSchema);
@@ -15,6 +21,22 @@ export type CreateTutorStudentInput = {
 export type UpdateTutorStudentStatusInput = {
   id: number;
   status: 'activo' | 'bloqueado';
+};
+
+export type UpdateTutorPastoralProfileInput = {
+  care_alerts?: string;
+  children_count?: number | null;
+  communication_preferences?: string;
+  current_challenges?: string;
+  emotional_state?: string;
+  family_situation?: string;
+  has_children: boolean;
+  next_steps?: string;
+  prayer_requests?: string;
+  sentimental_status?: string;
+  spiritual_needs?: string;
+  support_network?: string;
+  tutor_notes?: string;
 };
 
 export type CreateTutorGroupInput = {
@@ -60,6 +82,16 @@ export async function createTutorStudent(input: CreateTutorStudentInput) {
 export async function updateTutorStudentStatus(input: UpdateTutorStudentStatusInput) {
   const response = await api.put(`/tutor/usuarios/${input.id}/estado`, { status: input.status });
   return tutorStudentSchema.parse(extractApiData(response.data));
+}
+
+export async function updateTutorPastoralProfile(id: number, input: UpdateTutorPastoralProfileInput) {
+  const response = await api.put(`/tutor/usuarios/${id}/ficha`, input);
+  return tutorStudentSchema.parse(extractApiData(response.data));
+}
+
+export async function analyzeTutorPastoralProfile(id: number) {
+  const response = await api.post(`/tutor/usuarios/${id}/analisis-ia`, undefined, { timeout: 60000 });
+  return tutorPastoralAnalysisResponseSchema.parse(extractApiData(response.data));
 }
 
 export async function deleteTutorStudent(id: number) {

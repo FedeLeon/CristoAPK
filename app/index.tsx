@@ -5,11 +5,13 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight,
+  FileText,
   GraduationCap,
   IdCard,
   Megaphone,
   MessageCircle,
   Quote,
+  UsersRound,
 } from 'lucide-react-native';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { me } from '../src/api/auth';
@@ -17,7 +19,7 @@ import { getApiErrorMessage } from '../src/api/client';
 import { getDashboard, markDashboardAnnouncementRead } from '../src/api/dashboard';
 import { getAuthToken } from '../src/auth/tokenStorage';
 import { ScreenTitle } from '../src/components/ScreenTitle';
-import { ApiUser, DashboardAnnouncement } from '../src/types/api';
+import { ApiUser, DashboardAnnouncement, DashboardTutorMetric } from '../src/types/api';
 
 function getRoleDashboard(user?: ApiUser) {
   if (!user) {
@@ -74,11 +76,12 @@ export default function HomeScreen() {
 
   const isLoggedIn = Boolean(tokenQuery.data && meQuery.data);
   const isStudent = meQuery.data?.role === 'student';
+  const isTutor = meQuery.data?.role === 'tutor';
   const dashboard = getRoleDashboard(meQuery.data);
   const dashboardQuery = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboard,
-    enabled: Boolean(isLoggedIn && isStudent),
+    enabled: Boolean(isLoggedIn && (isStudent || isTutor)),
   });
   const markAnnouncementReadMutation = useMutation({
     mutationFn: markDashboardAnnouncementRead,
@@ -138,14 +141,15 @@ export default function HomeScreen() {
 
       {isLoggedIn ? (
         <>
-          {isStudent ? (
-            <StudentDashboardBlocks
+          {isStudent || isTutor ? (
+            <DashboardBlocks
               data={dashboardQuery.data}
               error={dashboardQuery.error}
               isError={dashboardQuery.isError}
               isLoading={dashboardQuery.isLoading}
               markReadId={markAnnouncementReadMutation.variables}
               onMarkRead={(id) => markAnnouncementReadMutation.mutate(id)}
+              role={isTutor ? 'tutor' : 'student'}
             />
           ) : null}
 
@@ -171,13 +175,14 @@ export default function HomeScreen() {
   );
 }
 
-function StudentDashboardBlocks({
+function DashboardBlocks({
   data,
   error,
   isError,
   isLoading,
   markReadId,
   onMarkRead,
+  role,
 }: {
   data?: Awaited<ReturnType<typeof getDashboard>>;
   error: unknown;
@@ -185,6 +190,7 @@ function StudentDashboardBlocks({
   isLoading: boolean;
   markReadId?: number;
   onMarkRead: (id: number) => void;
+  role: 'student' | 'tutor';
 }) {
   if (isLoading) {
     return (
@@ -208,6 +214,8 @@ function StudentDashboardBlocks({
 
   return (
     <>
+      {role === 'tutor' && data?.tutor_metrics?.length ? <TutorMetricsBlock metrics={data.tutor_metrics} /> : null}
+
       {data?.daily_verse ? (
         <View style={styles.dashboardBlock}>
           <View style={styles.blockHeader}>
@@ -245,7 +253,7 @@ function StudentDashboardBlocks({
           </View>
           <View style={styles.blockHeaderText}>
             <Text style={styles.blockEyebrow}>Anuncios</Text>
-            <Text style={styles.blockTitle}>Avisos generales y de tu tutor</Text>
+            <Text style={styles.blockTitle}>{role === 'tutor' ? 'Avisos generales y de tus usuarios' : 'Avisos generales y de tu tutor'}</Text>
           </View>
           {data?.announcements.unread_count ? (
             <View style={styles.unreadBadge}>
@@ -275,6 +283,55 @@ function StudentDashboardBlocks({
       </View>
     </>
   );
+}
+
+function TutorMetricsBlock({ metrics }: { metrics: DashboardTutorMetric[] }) {
+  return (
+    <View style={styles.dashboardBlock}>
+      <View style={styles.blockHeader}>
+        <View style={styles.blockIcon}>
+          <GraduationCap color="#1b6fd7" size={21} strokeWidth={2.2} />
+        </View>
+        <View style={styles.blockHeaderText}>
+          <Text style={styles.blockEyebrow}>Metricas</Text>
+          <Text style={styles.blockTitle}>Resumen de acompanamiento</Text>
+        </View>
+      </View>
+      <View style={styles.metricGrid}>
+        {metrics.map((metric) => {
+          const Icon = metricIcon(metric.key);
+
+          return (
+            <View key={metric.key} style={styles.metricCard}>
+              <View style={styles.metricIcon}>
+                <Icon color="#1b6fd7" size={20} strokeWidth={2.2} />
+              </View>
+              <View style={styles.metricText}>
+                <Text style={styles.metricLabel}>{metric.label}</Text>
+                <Text style={styles.metricValue}>{metric.value}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function metricIcon(key: string) {
+  if (key === 'students') {
+    return UsersRound;
+  }
+
+  if (key === 'lessons') {
+    return FileText;
+  }
+
+  if (key === 'announcements') {
+    return Megaphone;
+  }
+
+  return GraduationCap;
 }
 
 function AnnouncementCard({
@@ -324,12 +381,10 @@ function AnnouncementCard({
 
 const styles = StyleSheet.create({
   scrollView: {
-    backgroundColor: '#f6f7fb',
     flex: 1,
   },
   container: {
     alignItems: 'center',
-    backgroundColor: '#f6f7fb',
     padding: 28,
     paddingBottom: 112,
   },
@@ -526,6 +581,50 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  metricCard: {
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: '47%',
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: 10,
+    minHeight: 78,
+    padding: 12,
+  },
+  metricIcon: {
+    alignItems: 'center',
+    backgroundColor: '#e8f1ff',
+    borderRadius: 8,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  metricText: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  metricLabel: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 16,
+    textTransform: 'uppercase',
+  },
+  metricValue: {
+    color: '#151922',
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 30,
   },
   secondaryButton: {
     alignItems: 'center',

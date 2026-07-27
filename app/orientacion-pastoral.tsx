@@ -166,7 +166,6 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: '#f6f7fb',
     flex: 1,
   },
   container: {

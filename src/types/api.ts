@@ -103,8 +103,21 @@ export const bibleBookSchema = z.object({
   bible_version_id: z.union([z.number(), z.string()]).optional(),
   version_code: z.string().nullable().optional(),
   name: z.string(),
+  usfm: z.string().nullable().optional(),
   testament: z.string().nullable().optional(),
   position: z.number().optional(),
+});
+
+export const bibleVerseSchema = z.object({
+  id: z.union([z.number(), z.string()]),
+  number: z.number(),
+  text: z.string(),
+});
+
+export const bibleChapterSchema = z.object({
+  id: z.union([z.number(), z.string()]),
+  number: z.number(),
+  verses: z.array(bibleVerseSchema).default([]),
 });
 
 export const chatMessageSchema = z.object({
@@ -178,12 +191,19 @@ export const dashboardDailyVerseSchema = z.object({
   }),
 });
 
+export const dashboardTutorMetricSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  value: z.number(),
+});
+
 export const dashboardResponseSchema = z.object({
   daily_verse: dashboardDailyVerseSchema.nullable().optional(),
   announcements: z.object({
     unread_count: z.number(),
     data: z.array(dashboardAnnouncementSchema),
   }),
+  tutor_metrics: z.array(dashboardTutorMetricSchema).nullable().optional(),
 });
 
 export const pastoralGuidanceVerseSchema = z.object({
@@ -267,6 +287,28 @@ export const tutorStudentSchema = z.object({
     .optional(),
 });
 
+export const tutorPastoralAnalysisVerseSchema = z.object({
+  reference: z.string(),
+  text: z.string(),
+});
+
+export const tutorPastoralAnalysisSchema = z.object({
+  process_summary: z.string(),
+  recurring_topics: z.array(z.string()),
+  attention_points: z.array(z.string()),
+  suggested_questions: z.array(z.string()),
+  suggested_next_steps: z.array(z.string()),
+  recommended_verse_references: z.array(z.string()),
+  verses: z.array(tutorPastoralAnalysisVerseSchema),
+});
+
+export const tutorPastoralAnalysisResponseSchema = z.object({
+  ok: z.boolean(),
+  insufficient_context: z.boolean(),
+  error: z.string().nullable().optional(),
+  analysis: tutorPastoralAnalysisSchema.nullable(),
+});
+
 export const tutorGroupSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -292,14 +334,18 @@ export type Lesson = z.infer<typeof lessonSchema>;
 export type LessonContent = z.infer<typeof lessonContentSchema>;
 export type BibleVersion = z.infer<typeof bibleVersionSchema>;
 export type BibleBook = z.infer<typeof bibleBookSchema>;
+export type BibleChapter = z.infer<typeof bibleChapterSchema>;
+export type BibleVerse = z.infer<typeof bibleVerseSchema>;
 export type ChatConversation = z.infer<typeof chatConversationSchema>;
 export type Meeting = z.infer<typeof meetingSchema>;
 export type AppNotification = z.infer<typeof notificationSchema>;
 export type DashboardAnnouncement = z.infer<typeof dashboardAnnouncementSchema>;
 export type DashboardDailyVerse = z.infer<typeof dashboardDailyVerseSchema>;
+export type DashboardTutorMetric = z.infer<typeof dashboardTutorMetricSchema>;
 export type PastoralGuidanceResponse = z.infer<typeof pastoralGuidanceResponseSchema>;
 export type PastoralGuidanceVerse = z.infer<typeof pastoralGuidanceVerseSchema>;
 export type TutorGroup = z.infer<typeof tutorGroupSchema>;
+export type TutorPastoralAnalysisResponse = z.infer<typeof tutorPastoralAnalysisResponseSchema>;
 export type TutorStudent = z.infer<typeof tutorStudentSchema>;
 export type TutorUsersResponse = z.infer<typeof tutorUsersResponseSchema>;
 

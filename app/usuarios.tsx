@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -34,18 +35,25 @@ import {
   createTutorStudent,
   deleteTutorGroup,
   deleteTutorStudent,
+  analyzeTutorPastoralProfile,
   updateTutorGroup,
   updateTutorGroupStudents,
+  updateTutorPastoralProfile,
   updateTutorStudentStatus,
   type CreateTutorGroupInput,
+  type UpdateTutorPastoralProfileInput,
 } from '../src/api/tutorUsers';
 import { getTutorUsers } from '../src/api/tutorUsers';
 import { ScreenTitle } from '../src/components/ScreenTitle';
-import { TutorGroup, TutorStudent } from '../src/types/api';
+import { TutorGroup, TutorPastoralAnalysisResponse, TutorStudent } from '../src/types/api';
 
 type ActiveTab = 'students' | 'groups';
 type StudentDetailMode = 'actions' | 'pastoral' | 'progress' | 'ficha' | 'profile';
 type GroupFormState = CreateTutorGroupInput & { id?: number };
+type PastoralFormState = Omit<UpdateTutorPastoralProfileInput, 'has_children' | 'children_count'> & {
+  children_count: string;
+  has_children: boolean;
+};
 
 const dayOptions = [
   { label: 'Lun', value: 'monday' },
@@ -77,6 +85,49 @@ const emptyGroupForm: GroupFormState = {
   status: 'activo',
   students: [],
 };
+
+const emptyPastoralForm: PastoralFormState = {
+  care_alerts: '',
+  children_count: '',
+  communication_preferences: '',
+  current_challenges: '',
+  emotional_state: '',
+  family_situation: '',
+  has_children: false,
+  next_steps: '',
+  prayer_requests: '',
+  sentimental_status: '',
+  spiritual_needs: '',
+  support_network: '',
+  tutor_notes: '',
+};
+
+function pastoralFormFromStudent(student: TutorStudent): PastoralFormState {
+  const profile = student.pastoral_profile;
+
+  return {
+    care_alerts: profile?.care_alerts ?? '',
+    children_count: profile?.children_count ? String(profile.children_count) : '',
+    communication_preferences: profile?.communication_preferences ?? '',
+    current_challenges: profile?.current_challenges ?? '',
+    emotional_state: profile?.emotional_state ?? '',
+    family_situation: profile?.family_situation ?? '',
+    has_children: Boolean(profile?.has_children),
+    next_steps: profile?.next_steps ?? '',
+    prayer_requests: profile?.prayer_requests ?? '',
+    sentimental_status: profile?.sentimental_status ?? '',
+    spiritual_needs: profile?.spiritual_needs ?? '',
+    support_network: profile?.support_network ?? '',
+    tutor_notes: profile?.tutor_notes ?? '',
+  };
+}
+
+function pastoralPayloadFromForm(form: PastoralFormState): UpdateTutorPastoralProfileInput {
+  return {
+    ...form,
+    children_count: form.has_children && form.children_count ? Number(form.children_count) : null,
+  };
+}
 
 export default function TutorUsersScreen() {
   const queryClient = useQueryClient();
@@ -118,6 +169,14 @@ export default function TutorUsersScreen() {
   const updateStudentStatusMutation = useMutation({
     mutationFn: updateTutorStudentStatus,
     onSuccess: refreshTutorUsers,
+  });
+
+  const updatePastoralProfileMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: UpdateTutorPastoralProfileInput }) => updateTutorPastoralProfile(id, input),
+    onSuccess: async (student) => {
+      setSelectedStudent(student);
+      await refreshTutorUsers();
+    },
   });
 
   const deleteStudentMutation = useMutation({
@@ -429,6 +488,7 @@ export default function TutorUsersScreen() {
                     <View style={[styles.checkBox, selected && styles.checkBoxSelected]}>
                       {selected ? <Check color="#ffffff" size={14} strokeWidth={2.8} /> : null}
                     </View>
+                    <UserAvatar user={student} size={42} />
                     <View style={styles.assignmentText}>
                       <Text style={styles.cardTitle}>{student.name}</Text>
                       <Text style={styles.meta}>{student.email}</Text>
@@ -465,7 +525,7 @@ export default function TutorUsersScreen() {
         onRequestClose={() => setSelectedStudent(null)}
       >
         <View style={styles.centeredModalBackdrop}>
-          <ScrollView contentContainerStyle={styles.studentActionCard} style={styles.centeredModalScroll}>
+          <View style={styles.studentActionCard}>
             {selectedStudent ? (
               <StudentActionModal
                 busy={updateStudentStatusMutation.isPending || deleteStudentMutation.isPending}
@@ -479,16 +539,24 @@ export default function TutorUsersScreen() {
                   })
                 }
                 onModeChange={setStudentDetailMode}
+                onSavePastoralProfile={(input) =>
+                  updatePastoralProfileMutation.mutate({
+                    id: selectedStudent.id,
+                    input,
+                  })
+                }
                 onToggleStatus={() =>
                   confirmToggleStudentStatus(selectedStudent, (id, status) => {
                     setSelectedStudent(null);
                     updateStudentStatusMutation.mutate({ id, status });
                   })
                 }
+                pastoralSaveError={updatePastoralProfileMutation.error}
+                pastoralSaving={updatePastoralProfileMutation.isPending}
                 student={selectedStudent}
               />
             ) : null}
-          </ScrollView>
+          </View>
         </View>
       </Modal>
     </>
@@ -524,6 +592,24 @@ function StudentCard({
   );
 }
 
+function UserAvatar({ size, user }: { size: number; user: TutorStudent }) {
+  if (user.avatar_url) {
+    return <Image source={{ uri: user.avatar_url }} style={[styles.userAvatar, { height: size, width: size }]} />;
+  }
+
+  return (
+    <View
+      style={[
+        styles.userAvatar,
+        styles.userAvatarFallback,
+        { backgroundColor: user.avatar_color ?? '#1b6fd7', height: size, width: size },
+      ]}
+    >
+      <Text style={styles.userAvatarInitials}>{user.avatar_initials ?? user.name.slice(0, 1).toUpperCase()}</Text>
+    </View>
+  );
+}
+
 function StudentActionModal({
   busy,
   mode,
@@ -531,7 +617,10 @@ function StudentActionModal({
   onClose,
   onDelete,
   onModeChange,
+  onSavePastoralProfile,
   onToggleStatus,
+  pastoralSaveError,
+  pastoralSaving,
   student,
 }: {
   busy: boolean;
@@ -540,7 +629,10 @@ function StudentActionModal({
   onClose: () => void;
   onDelete: () => void;
   onModeChange: (mode: StudentDetailMode) => void;
+  onSavePastoralProfile: (input: UpdateTutorPastoralProfileInput) => void;
   onToggleStatus: () => void;
+  pastoralSaveError: unknown;
+  pastoralSaving: boolean;
   student: TutorStudent;
 }) {
   const blocked = student.status === 'bloqueado';
@@ -556,10 +648,19 @@ function StudentActionModal({
             <Text style={styles.smallLinkButtonText}>Cerrar</Text>
           </Pressable>
         </View>
-        {mode === 'pastoral' ? <PastoralDetail student={student} /> : null}
-        {mode === 'progress' ? <ProgressDetail student={student} /> : null}
-        {mode === 'ficha' ? <FichaDetail student={student} /> : null}
-        {mode === 'profile' ? <UserProfileDetail student={student} /> : null}
+        <ScrollView contentContainerStyle={styles.studentDetailScrollContent} showsVerticalScrollIndicator style={styles.studentDetailScroll}>
+          {mode === 'pastoral' ? <PastoralDetail student={student} /> : null}
+          {mode === 'progress' ? <ProgressDetail student={student} /> : null}
+          {mode === 'ficha' ? (
+            <FichaDetail
+              error={pastoralSaveError}
+              saving={pastoralSaving}
+              student={student}
+              onSave={onSavePastoralProfile}
+            />
+          ) : null}
+          {mode === 'profile' ? <UserProfileDetail student={student} /> : null}
+        </ScrollView>
       </>
     );
   }
@@ -621,6 +722,9 @@ function StudentActionButton({
 
 function PastoralDetail({ student }: { student: TutorStudent }) {
   const profile = student.pastoral_profile;
+  const analysisMutation = useMutation({
+    mutationFn: () => analyzeTutorPastoralProfile(student.id),
+  });
 
   return (
     <View style={styles.detailBlock}>
@@ -630,6 +734,62 @@ function PastoralDetail({ student }: { student: TutorStudent }) {
       <InfoRow label="Proximos pasos" value={profile?.next_steps} />
       <InfoRow label="Notas del tutor" value={profile?.tutor_notes} />
       <InfoRow label="Ultima actualizacion" value={formatDateTime(profile?.pastoral_updated_at)} />
+      <Pressable
+        disabled={analysisMutation.isPending}
+        style={[styles.primaryFullButton, analysisMutation.isPending && styles.disabled]}
+        onPress={() => analysisMutation.mutate()}
+      >
+        {analysisMutation.isPending ? <ActivityIndicator color="#ffffff" /> : <HeartPulse color="#ffffff" size={18} strokeWidth={2.2} />}
+        <Text style={styles.primaryFullButtonText}>{analysisMutation.isPending ? 'Consultando...' : 'Consultar ayuda IA'}</Text>
+      </Pressable>
+      {analysisMutation.isError ? <Text style={styles.error}>{getApiErrorMessage(analysisMutation.error)}</Text> : null}
+      {analysisMutation.data ? <PastoralAnalysisResult result={analysisMutation.data} /> : null}
+    </View>
+  );
+}
+
+function PastoralAnalysisResult({ result }: { result: TutorPastoralAnalysisResponse }) {
+  if (!result.ok || !result.analysis) {
+    return <Text style={styles.error}>{result.error ?? 'No se pudo generar el analisis pastoral.'}</Text>;
+  }
+
+  return (
+    <View style={styles.aiResult}>
+      <Text style={styles.aiTitle}>Sugerencia pastoral</Text>
+      <Text style={styles.text}>{result.analysis.process_summary}</Text>
+      <AnalysisList title="Temas recurrentes" values={result.analysis.recurring_topics} />
+      <AnalysisList title="Puntos de atencion" values={result.analysis.attention_points} />
+      <AnalysisList title="Preguntas sugeridas" values={result.analysis.suggested_questions} />
+      <AnalysisList title="Proximos pasos" values={result.analysis.suggested_next_steps} />
+      {result.analysis.verses.length ? (
+        <View style={styles.aiSection}>
+          <Text style={styles.aiSectionTitle}>Versiculos recomendados</Text>
+          {result.analysis.verses.map((verse) => (
+            <View key={verse.reference} style={styles.aiVerse}>
+              <Text style={styles.infoLabel}>{verse.reference}</Text>
+              <Text style={styles.infoValue}>{verse.text}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <Text style={styles.meta}>
+        Las sugerencias son una ayuda para el tutor y no reemplazan el acompanamiento humano ni la atencion profesional cuando corresponda.
+      </Text>
+    </View>
+  );
+}
+
+function AnalysisList({ title, values }: { title: string; values: string[] }) {
+  if (!values.length) {
+    return null;
+  }
+
+  return (
+    <View style={styles.aiSection}>
+      <Text style={styles.aiSectionTitle}>{title}</Text>
+      {values.map((value) => (
+        <Text key={value} style={styles.aiBullet}>- {value}</Text>
+      ))}
     </View>
   );
 }
@@ -669,23 +829,73 @@ function ProgressDetail({ student }: { student: TutorStudent }) {
   );
 }
 
-function FichaDetail({ student }: { student: TutorStudent }) {
-  const profile = student.pastoral_profile;
+function FichaDetail({
+  error,
+  onSave,
+  saving,
+  student,
+}: {
+  error: unknown;
+  onSave: (input: UpdateTutorPastoralProfileInput) => void;
+  saving: boolean;
+  student: TutorStudent;
+}) {
+  const [form, setForm] = useState<PastoralFormState>(() => pastoralFormFromStudent(student));
+
+  useEffect(() => {
+    setForm(pastoralFormFromStudent(student));
+  }, [student]);
+
+  function updateField(field: keyof PastoralFormState, value: string | boolean) {
+    setForm((current) => ({
+      ...current,
+      [field]: field === 'children_count' && typeof value === 'string' ? value.replace(/\D/g, '').slice(0, 2) : value,
+    }));
+  }
 
   return (
     <View style={styles.detailBlock}>
       <ScreenTitle icon="pastoral" size="medium" text="Ficha" />
-      <InfoRow label="Situacion sentimental" value={profile?.sentimental_status} />
-      <InfoRow
-        label="Hijos"
-        value={profile?.has_children ? `Si${profile.children_count ? `, ${profile.children_count}` : ''}` : 'No'}
+      <Field label="Situacion sentimental" value={form.sentimental_status ?? ''} onChangeText={(value) => updateField('sentimental_status', value)} />
+      <View style={styles.field}>
+        <Text style={styles.inputLabel}>Hijos</Text>
+        <View style={styles.choiceWrap}>
+          <Choice label="No" selected={!form.has_children} onPress={() => updateField('has_children', false)} />
+          <Choice label="Si" selected={form.has_children} onPress={() => updateField('has_children', true)} />
+        </View>
+      </View>
+      {form.has_children ? (
+        <Field
+          keyboardType="number-pad"
+          label="Cantidad de hijos"
+          value={form.children_count}
+          onChangeText={(value) => updateField('children_count', value)}
+        />
+      ) : null}
+      <Field multiline label="Situacion familiar" value={form.family_situation ?? ''} onChangeText={(value) => updateField('family_situation', value)} />
+      <Field multiline label="Desafios actuales" value={form.current_challenges ?? ''} onChangeText={(value) => updateField('current_challenges', value)} />
+      <Field label="Estado emocional" value={form.emotional_state ?? ''} onChangeText={(value) => updateField('emotional_state', value)} />
+      <Field multiline label="Necesidades espirituales" value={form.spiritual_needs ?? ''} onChangeText={(value) => updateField('spiritual_needs', value)} />
+      <Field multiline label="Pedidos de oracion" value={form.prayer_requests ?? ''} onChangeText={(value) => updateField('prayer_requests', value)} />
+      <Field multiline label="Red de apoyo" value={form.support_network ?? ''} onChangeText={(value) => updateField('support_network', value)} />
+      <Field
+        multiline
+        label="Preferencias de comunicacion"
+        value={form.communication_preferences ?? ''}
+        onChangeText={(value) => updateField('communication_preferences', value)}
       />
-      <InfoRow label="Situacion familiar" value={profile?.family_situation} />
-      <InfoRow label="Desafios actuales" value={profile?.current_challenges} />
-      <InfoRow label="Necesidades espirituales" value={profile?.spiritual_needs} />
-      <InfoRow label="Pedidos de oracion" value={profile?.prayer_requests} />
-      <InfoRow label="Red de apoyo" value={profile?.support_network} />
-      <InfoRow label="Preferencias de comunicacion" value={profile?.communication_preferences} />
+      <Field multiline label="Alertas de cuidado" value={form.care_alerts ?? ''} onChangeText={(value) => updateField('care_alerts', value)} />
+      <Field multiline label="Proximos pasos" value={form.next_steps ?? ''} onChangeText={(value) => updateField('next_steps', value)} />
+      <Field multiline label="Notas del tutor" value={form.tutor_notes ?? ''} onChangeText={(value) => updateField('tutor_notes', value)} />
+      {error ? <Text style={styles.error}>{getApiErrorMessage(error)}</Text> : null}
+      <Pressable
+        disabled={saving}
+        style={[styles.primaryFullButton, saving && styles.disabled]}
+        onPress={() => onSave(pastoralPayloadFromForm(form))}
+      >
+        {saving ? <ActivityIndicator color="#ffffff" /> : <Check color="#ffffff" size={18} strokeWidth={2.4} />}
+        <Text style={styles.primaryFullButtonText}>{saving ? 'Guardando...' : 'Guardar ficha'}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -701,8 +911,8 @@ function UserProfileDetail({ student }: { student: TutorStudent }) {
       <InfoRow label="Fecha de nacimiento" value={profile?.birth_date} />
       <InfoRow label="Telefono" value={profile?.phone} />
       <InfoRow label="Direccion" value={profile?.address} />
-      <InfoRow label="Pais" value={profile?.country} />
-      <InfoRow label="Provincia / Estado" value={profile?.state} />
+      <InfoRow label="Nacionalidad" value={profile?.country} />
+      <InfoRow label="Provincia" value={profile?.state} />
       <InfoRow label="Ciudad / Localidad" value={profile?.city} />
       <InfoRow label="Codigo postal" value={profile?.postal_code} />
     </View>
@@ -769,7 +979,7 @@ function Field({
   ...props
 }: {
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
-  keyboardType?: 'default' | 'email-address';
+  keyboardType?: 'default' | 'email-address' | 'number-pad';
   label: string;
   multiline?: boolean;
   onChangeText: (value: string) => void;
@@ -914,6 +1124,41 @@ const styles = StyleSheet.create({
   assignmentText: {
     flex: 1,
     gap: 2,
+    minWidth: 0,
+  },
+  aiBullet: {
+    color: '#42526a',
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  aiResult: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#dce2ea',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 12,
+  },
+  aiSection: {
+    gap: 6,
+  },
+  aiSectionTitle: {
+    color: '#151922',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  aiTitle: {
+    color: '#1b6fd7',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  aiVerse: {
+    backgroundColor: '#ffffff',
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 5,
+    padding: 10,
   },
   avatar: {
     alignItems: 'center',
@@ -1074,6 +1319,7 @@ const styles = StyleSheet.create({
   },
   detailBlock: {
     gap: 12,
+    width: '100%',
   },
   groupIcon: {
     alignItems: 'center',
@@ -1170,6 +1416,7 @@ const styles = StyleSheet.create({
   },
   modalHeaderRow: {
     alignItems: 'center',
+    flexShrink: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
@@ -1187,6 +1434,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  primaryFullButton: {
+    alignItems: 'center',
+    backgroundColor: '#1b6fd7',
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  primaryFullButtonText: {
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '900',
@@ -1322,6 +1585,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 14,
     maxHeight: '88%',
+    overflow: 'hidden',
     padding: 18,
     width: '100%',
   },
@@ -1329,6 +1593,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  studentDetailScroll: {
+    flexShrink: 1,
+    maxHeight: '100%',
+    width: '100%',
+  },
+  studentDetailScrollContent: {
+    gap: 12,
+    paddingBottom: 12,
   },
   tab: {
     alignItems: 'center',
@@ -1358,6 +1631,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 4,
     padding: 4,
+  },
+  userAvatar: {
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  userAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userAvatarInitials: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '900',
   },
   text: {
     color: '#516070',

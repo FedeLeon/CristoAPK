@@ -138,7 +138,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   screen: {
-    backgroundColor: '#f6f7fb',
     flex: 1,
     justifyContent: 'center',
   },

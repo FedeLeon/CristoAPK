@@ -22,6 +22,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { logout, me } from '../src/api/auth';
 import { getNotifications, markNotificationsRead } from '../src/api/notifications';
 import { getAuthToken } from '../src/auth/tokenStorage';
+import { AppBackground } from '../src/components/AppBackground';
 import { ScreenTitle, ScreenTitleIcon } from '../src/components/ScreenTitle';
 
 export default function RootLayout() {
@@ -41,6 +42,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <View style={styles.shell}>
+          <AppBackground />
           <LogicalAndroidBackHandler />
           <StatusBar hidden={false} style="dark" />
           <View style={styles.stackArea}>
@@ -51,7 +53,7 @@ export default function RootLayout() {
                 headerTitle: () => <AppHeaderTitle />,
                 headerStyle: { backgroundColor: '#ffffff' },
                 headerShadowVisible: false,
-                contentStyle: { backgroundColor: '#f6f7fb' },
+                contentStyle: { backgroundColor: 'transparent' },
               }}
             >
               <Stack.Screen name="index" options={{ headerBackVisible: false, title: 'MDS' }} />
