@@ -41,7 +41,10 @@ export function getApiErrorMessage(error: unknown) {
   }
 
   if (!error.response) {
-    return 'No se pudo conectar con la API. Revisa la URL y que Laravel este corriendo.';
+    const apiUrl = api.defaults.baseURL ?? 'sin configurar';
+    const detail = error.message ? ` Detalle: ${error.message}.` : '';
+
+    return `No se pudo conectar con la API. URL actual: ${apiUrl}.${detail}`;
   }
 
   const status = error.response.status;

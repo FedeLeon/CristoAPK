@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { BookOpen, CalendarDays, GraduationCap, MessageCircle } from 'lucide-react-native';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { logout, me } from '../src/api/auth';
+import { me } from '../src/api/auth';
 import { getApiErrorMessage } from '../src/api/client';
 import { getAuthToken } from '../src/auth/tokenStorage';
 import { ApiUser } from '../src/types/api';
@@ -12,7 +13,6 @@ function getRoleDashboard(user?: ApiUser) {
       label: 'Visitante',
       title: 'Bienvenido a MDS',
       message: 'Mensaje de salvacion',
-      actions: [],
     };
   }
 
@@ -21,7 +21,6 @@ function getRoleDashboard(user?: ApiUser) {
       label: 'Administrador',
       title: 'Dashboard Admin',
       message: 'Bienvenido al panel mobile de administracion.',
-      actions: ['Gestion general', 'Usuarios', 'Contenido'],
     };
   }
 
@@ -30,7 +29,6 @@ function getRoleDashboard(user?: ApiUser) {
       label: 'Tutor',
       title: 'Dashboard Tutor',
       message: 'Bienvenido al panel mobile de acompanamiento.',
-      actions: ['Mis usuarios', 'Grupos', 'Cursos'],
     };
   }
 
@@ -38,13 +36,10 @@ function getRoleDashboard(user?: ApiUser) {
     label: 'Usuario',
     title: 'Dashboard Usuario',
     message: 'Bienvenido a tu espacio mobile de aprendizaje.',
-    actions: ['Cursos', 'Biblia', 'Progreso'],
   };
 }
 
 export default function HomeScreen() {
-  const queryClient = useQueryClient();
-
   const tokenQuery = useQuery({
     queryKey: ['auth-token'],
     queryFn: getAuthToken,
@@ -56,15 +51,14 @@ export default function HomeScreen() {
     enabled: Boolean(tokenQuery.data),
   });
 
-  const logoutMutation = useMutation({
-    mutationFn: logout,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries();
-    },
-  });
-
   const isLoggedIn = Boolean(tokenQuery.data && meQuery.data);
   const dashboard = getRoleDashboard(meQuery.data);
+  const quickActions = [
+    { icon: GraduationCap, label: 'Contenido general', route: '/cursos' },
+    { icon: BookOpen, label: 'Biblia', route: '/biblia' },
+    { icon: CalendarDays, label: 'Reuniones', route: '/reuniones' },
+    { icon: MessageCircle, label: 'Chat', route: '/chat' },
+  ] as const;
 
   return (
     <View style={styles.container}>
@@ -88,29 +82,17 @@ export default function HomeScreen() {
       </View>
 
       {isLoggedIn ? (
-        <View style={styles.actions}>
-          <View style={styles.summaryGrid}>
-            {dashboard.actions.map((action) => (
-              <View key={action} style={styles.summaryCard}>
-                <Text style={styles.summaryText}>{action}</Text>
-              </View>
-            ))}
-          </View>
-          <Pressable style={styles.primaryButton} onPress={() => router.push('/cursos')}>
-            <Text style={styles.primaryButtonText}>Ver cursos</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => router.push('/biblia')}>
-            <Text style={styles.secondaryButtonText}>Ver biblia</Text>
-          </Pressable>
-          <Pressable
-            disabled={logoutMutation.isPending}
-            style={[styles.ghostButton, logoutMutation.isPending && styles.disabledButton]}
-            onPress={() => logoutMutation.mutate()}
-          >
-            <Text style={styles.ghostButtonText}>
-              {logoutMutation.isPending ? 'Cerrando...' : 'Cerrar sesion'}
-            </Text>
-          </Pressable>
+        <View style={styles.quickGrid}>
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+
+            return (
+              <Pressable key={action.route} style={styles.quickButton} onPress={() => router.push(action.route)}>
+                <Icon color="#1b6fd7" size={28} strokeWidth={2.1} />
+                <Text style={styles.quickButtonText}>{action.label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
       ) : (
         <Pressable style={styles.primaryButton} onPress={() => router.push('/login')}>
@@ -187,31 +169,29 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  actions: {
-    gap: 10,
+  quickGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
     marginTop: 18,
     width: '100%',
   },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    width: '100%',
-  },
-  summaryCard: {
+  quickButton: {
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderColor: '#dce2ea',
     borderRadius: 8,
     borderWidth: 1,
+    flexBasis: '47%',
     flexGrow: 1,
-    minWidth: '30%',
-    paddingHorizontal: 10,
-    paddingVertical: 12,
+    gap: 10,
+    justifyContent: 'center',
+    minHeight: 126,
+    padding: 12,
   },
-  summaryText: {
+  quickButtonText: {
     color: '#2f3947',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -228,34 +208,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '800',
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#c3cfdd',
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    width: '100%',
-  },
-  secondaryButtonText: {
-    color: '#151922',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  ghostButton: {
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    width: '100%',
-  },
-  ghostButtonText: {
-    color: '#516070',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  disabledButton: {
-    opacity: 0.65,
   },
 });

@@ -1,22 +1,58 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { Check, Eye, EyeOff } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { login } from '../src/api/auth';
 import { getApiErrorMessage } from '../src/api/client';
+import { clearRememberedEmail, getRememberedEmail, setRememberedEmail } from '../src/auth/rememberedEmailStorage';
 
 export default function LoginScreen() {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberEmail, setRememberEmail] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getRememberedEmail().then((storedEmail) => {
+      if (!isMounted || !storedEmail) {
+        return;
+      }
+
+      setEmail(storedEmail);
+      setRememberEmail(true);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const loginMutation = useMutation({
     mutationFn: () => login(email.trim(), password),
     onSuccess: async () => {
+      if (rememberEmail) {
+        await setRememberedEmail(email.trim());
+      } else {
+        await clearRememberedEmail();
+      }
+
       await queryClient.invalidateQueries();
       router.replace('/');
     },
   });
+
+  const toggleRememberEmail = async () => {
+    const nextValue = !rememberEmail;
+    setRememberEmail(nextValue);
+
+    if (!nextValue) {
+      await clearRememberedEmail();
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -42,15 +78,42 @@ export default function LoginScreen() {
 
         <View style={styles.field}>
           <Text style={styles.label}>Password</Text>
-          <TextInput
-            autoCapitalize="none"
-            onChangeText={setPassword}
-            placeholder="usuario1234"
-            secureTextEntry
-            style={styles.input}
-            value={password}
-          />
+          <View style={styles.passwordInput}>
+            <TextInput
+              autoCapitalize="none"
+              autoComplete="password"
+              onChangeText={setPassword}
+              placeholder="usuario1234"
+              secureTextEntry={!showPassword}
+              style={styles.passwordTextInput}
+              value={password}
+            />
+            <Pressable
+              accessibilityLabel={showPassword ? 'Ocultar password' : 'Mostrar password'}
+              accessibilityRole="button"
+              onPress={() => setShowPassword((current) => !current)}
+              style={styles.iconButton}
+            >
+              {showPassword ? (
+                <EyeOff color="#516070" size={22} strokeWidth={2.2} />
+              ) : (
+                <Eye color="#516070" size={22} strokeWidth={2.2} />
+              )}
+            </Pressable>
+          </View>
         </View>
+
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: rememberEmail }}
+          onPress={toggleRememberEmail}
+          style={styles.rememberRow}
+        >
+          <View style={[styles.checkbox, rememberEmail && styles.checkboxChecked]}>
+            {rememberEmail ? <Check color="#ffffff" size={15} strokeWidth={3} /> : null}
+          </View>
+          <Text style={styles.rememberText}>Recordar usuario</Text>
+        </Pressable>
 
         {loginMutation.isError ? (
           <Text style={styles.error}>{getApiErrorMessage(loginMutation.error)}</Text>
@@ -109,6 +172,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  passwordInput: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+  },
+  passwordTextInput: {
+    color: '#151922',
+    flex: 1,
+    fontSize: 16,
+    paddingLeft: 14,
+    paddingRight: 8,
+    paddingVertical: 12,
+  },
+  iconButton: {
+    alignItems: 'center',
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  rememberRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 2,
+  },
+  checkbox: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#94a3b8',
+    borderRadius: 5,
+    borderWidth: 1.5,
+    height: 22,
+    justifyContent: 'center',
+    width: 22,
+  },
+  checkboxChecked: {
+    backgroundColor: '#1b6fd7',
+    borderColor: '#1b6fd7',
+  },
+  rememberText: {
+    color: '#2f3947',
+    fontSize: 15,
+    fontWeight: '600',
   },
   error: {
     color: '#b42318',
