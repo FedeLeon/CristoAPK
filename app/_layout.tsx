@@ -27,7 +27,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: '#f6f7fb' },
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'CristoApp' }} />
+        <Stack.Screen name="index" options={{ title: 'MDS' }} />
         <Stack.Screen name="login" options={{ title: 'Ingresar' }} />
         <Stack.Screen name="cursos/index" options={{ title: 'Cursos' }} />
         <Stack.Screen name="cursos/[id]" options={{ title: 'Curso' }} />

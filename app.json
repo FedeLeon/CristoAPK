@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "CristoAPK",
-    "slug": "CristoAPK",
+    "name": "MDS",
+    "slug": "mds",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

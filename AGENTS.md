@@ -89,6 +89,11 @@ This repository is the native mobile client for CristoApp.
 - Keep the first screen as the usable app, not a landing page.
 - Build compact, practical mobile screens for repeated use.
 - Use native React Native components unless a library is already installed and appropriate.
+- Use the MDS dove assets as the only app brand icon from now on:
+  - source SVG files live in `assets/brand/mds-dove-black.svg` and `assets/brand/mds-dove-white.svg`;
+  - generated PNG files live in `assets/brand/` and the Expo icon files in `assets/`;
+  - run `npm run generate-brand-assets` after changing the source SVG files;
+  - do not reintroduce the default Expo icon or a different logo.
 - Keep visual style consistent with the current quiet, light, card-based mobile UI:
   - white surfaces,
   - light gray borders,
