@@ -1,6 +1,6 @@
 # CristoAPK
 
-APK Android de CristoApp creada con Expo, React Native, TypeScript, Expo Router, Axios, TanStack Query, Expo SecureStore y Zod.
+APK Android de CristoApp creada con Expo, React Native, TypeScript, Expo Router, Axios, TanStack Query, Expo SecureStore, Expo SQLite y Zod.
 
 Laravel se consume como API externa. Este proyecto no convierte Laravel en APK y no usa WebView como solucion principal.
 
@@ -41,6 +41,35 @@ En otra terminal:
 cd /var/www/html/CristoApp
 php artisan serve --host=0.0.0.0 --port=8000
 ```
+
+## Usuarios dummy de la API mobile
+
+```text
+Usuario
+email: usuario@example.com
+password: usuario1234
+
+Tutor
+email: tuto@example.com
+password: tutor1234
+
+Admin
+email: admin@example.com
+password: admin1234
+```
+
+Estos datos salen del seeder `ApiDemoUserSeeder` del backend Laravel y se guardan en la tabla real `users`.
+
+## Datos locales en el dispositivo
+
+La fuente de verdad es siempre la API Laravel. La APK no se conecta directo a MySQL y no guarda credenciales de base de datos.
+
+La APK usa:
+
+- `SecureStore` para guardar el token Bearer.
+- `SQLite` local (`mds-local.db`) para cache de respuestas API reutilizables, por ejemplo cursos y Biblia.
+
+Si hay conexion, las pantallas consultan Laravel y actualizan el cache local. Si hay un error de red, algunas pantallas pueden reutilizar la ultima copia guardada en SQLite.
 
 ## Ejecutar la app mobile
 

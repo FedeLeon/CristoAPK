@@ -25,7 +25,7 @@ export default function LoginScreen() {
     >
       <View style={styles.panel}>
         <Text style={styles.title}>Ingresar</Text>
-        <Text style={styles.text}>Usa el usuario expuesto por la API Laravel.</Text>
+        <Text style={styles.text}>Ingresa con el email y la contraseña de tu rol.</Text>
 
         <View style={styles.field}>
           <Text style={styles.label}>Email</Text>
@@ -34,7 +34,7 @@ export default function LoginScreen() {
             autoComplete="email"
             keyboardType="email-address"
             onChangeText={setEmail}
-            placeholder="usuario@test.com"
+            placeholder="usuario@example.com"
             style={styles.input}
             value={email}
           />
@@ -45,7 +45,7 @@ export default function LoginScreen() {
           <TextInput
             autoCapitalize="none"
             onChangeText={setPassword}
-            placeholder="password"
+            placeholder="usuario1234"
             secureTextEntry
             style={styles.input}
             value={password}

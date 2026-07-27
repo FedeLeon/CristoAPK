@@ -1,4 +1,5 @@
 import { clearAuthToken, setAuthToken } from '../auth/tokenStorage';
+import { clearApiCache } from '../storage/localDb';
 import { extractApiData, loginResponseSchema, userSchema } from '../types/api';
 import { api } from './client';
 
@@ -16,6 +17,7 @@ export async function logout() {
     await api.post('/logout');
   } finally {
     await clearAuthToken();
+    await clearApiCache();
   }
 }
 

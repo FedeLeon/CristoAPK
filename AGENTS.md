@@ -24,6 +24,7 @@ This repository is the native mobile client for CristoApp.
 - Axios for HTTP requests.
 - TanStack Query for server state, cache, loading states, errors, refetch, and invalidation.
 - Expo SecureStore for authentication token persistence.
+- Expo SQLite for local device cache/offline data. This is app-local storage, not a MySQL connection.
 - Zod for validating important API responses at the app boundary.
 
 ## Directory Ownership
@@ -32,6 +33,7 @@ This repository is the native mobile client for CristoApp.
 - `app/_layout.tsx`: global providers and navigator setup.
 - `src/api/`: API client and endpoint-specific API functions.
 - `src/auth/`: token storage and future auth/session helpers.
+- `src/storage/`: local device persistence such as SQLite cache.
 - `src/types/`: API schemas and TypeScript types.
 - Future shared UI should go in `src/components/`.
 - Future hooks should go in `src/hooks/`.
@@ -66,6 +68,8 @@ This repository is the native mobile client for CristoApp.
 
 - Store only the API token in SecureStore under the existing `auth_token` key unless a migration is explicitly needed.
 - Do not store passwords.
+- Do not store MySQL credentials in the APK.
+- Do not connect the APK directly to MySQL. All authoritative data must come from Laravel API endpoints.
 - Login flow:
   - `POST /api/login`.
   - Validate response with Zod.
@@ -80,6 +84,7 @@ This repository is the native mobile client for CristoApp.
 ## State Rules
 
 - Use TanStack Query for API data.
+- Use SQLite only as local cache/offline storage for data already received from the Laravel API.
 - Do not duplicate server state into React `useState` unless the screen needs temporary editable form state.
 - Use stable query keys such as `['me']`, `['courses']`, `['course', id]`, `['bible-books']`.
 - After login/logout or mutations that change visible server data, invalidate the affected queries.

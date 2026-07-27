@@ -30,10 +30,27 @@ export const bibleBookSchema = z.object({
   name: z.string(),
 });
 
+export const chatMessageSchema = z.object({
+  id: z.number(),
+  body: z.string(),
+  created_at: z.string().nullable().optional(),
+  user: userSchema.optional(),
+});
+
+export const chatConversationSchema = z.object({
+  id: z.number(),
+  type: z.string(),
+  title: z.string(),
+  participants: z.array(userSchema).optional(),
+  last_message: chatMessageSchema.nullable().optional(),
+  messages: z.array(chatMessageSchema).optional(),
+});
+
 export type ApiUser = z.infer<typeof userSchema>;
 export type Course = z.infer<typeof courseSchema>;
 export type BibleVersion = z.infer<typeof bibleVersionSchema>;
 export type BibleBook = z.infer<typeof bibleBookSchema>;
+export type ChatConversation = z.infer<typeof chatConversationSchema>;
 
 export function extractApiData<T>(payload: T | { data: T }): T {
   if (payload && typeof payload === 'object' && 'data' in payload) {

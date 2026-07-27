@@ -33,7 +33,11 @@ api.interceptors.response.use(
 
 export function getApiErrorMessage(error: unknown) {
   if (!axios.isAxiosError(error)) {
-    return 'Ocurrio un error inesperado.';
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return 'Ocurrio un error inesperado en la app.';
   }
 
   if (!error.response) {

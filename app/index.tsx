@@ -1,18 +1,122 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { logout, me } from '../src/api/auth';
+import { getApiErrorMessage } from '../src/api/client';
+import { getAuthToken } from '../src/auth/tokenStorage';
+import { ApiUser } from '../src/types/api';
+
+function getRoleDashboard(user?: ApiUser) {
+  if (!user) {
+    return {
+      label: 'Visitante',
+      title: 'Bienvenido a MDS',
+      message: 'Mensaje de salvacion',
+      actions: [],
+    };
+  }
+
+  if (user.role === 'admin') {
+    return {
+      label: 'Administrador',
+      title: 'Dashboard Admin',
+      message: 'Bienvenido al panel mobile de administracion.',
+      actions: ['Gestion general', 'Usuarios', 'Contenido'],
+    };
+  }
+
+  if (user.role === 'tutor') {
+    return {
+      label: 'Tutor',
+      title: 'Dashboard Tutor',
+      message: 'Bienvenido al panel mobile de acompanamiento.',
+      actions: ['Mis usuarios', 'Grupos', 'Cursos'],
+    };
+  }
+
+  return {
+    label: 'Usuario',
+    title: 'Dashboard Usuario',
+    message: 'Bienvenido a tu espacio mobile de aprendizaje.',
+    actions: ['Cursos', 'Biblia', 'Progreso'],
+  };
+}
 
 export default function HomeScreen() {
+  const queryClient = useQueryClient();
+
+  const tokenQuery = useQuery({
+    queryKey: ['auth-token'],
+    queryFn: getAuthToken,
+  });
+
+  const meQuery = useQuery({
+    queryKey: ['me'],
+    queryFn: me,
+    enabled: Boolean(tokenQuery.data),
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries();
+    },
+  });
+
+  const isLoggedIn = Boolean(tokenQuery.data && meQuery.data);
+  const dashboard = getRoleDashboard(meQuery.data);
+
   return (
     <View style={styles.container}>
       <View style={styles.brandPanel}>
         <Image source={require('../assets/brand/mds-dove-black.png')} style={styles.logo} />
-        <Text style={styles.title}>Bienvenido a MDS</Text>
-        <Text style={styles.subtitle}>Mensaje de salvacion</Text>
+        <Text style={styles.roleBadge}>{dashboard.label}</Text>
+        <Text style={styles.title}>{isLoggedIn ? dashboard.title : 'Bienvenido a MDS'}</Text>
+        <Text style={styles.subtitle}>{isLoggedIn ? dashboard.message : 'Mensaje de salvacion'}</Text>
+        {tokenQuery.isLoading || meQuery.isLoading ? (
+          <View style={styles.sessionRow}>
+            <ActivityIndicator />
+            <Text style={styles.sessionText}>Cargando sesion...</Text>
+          </View>
+        ) : null}
+        {meQuery.isError ? <Text style={styles.error}>{getApiErrorMessage(meQuery.error)}</Text> : null}
+        {isLoggedIn ? (
+          <Text style={styles.sessionText}>
+            {meQuery.data?.name} - {meQuery.data?.email}
+          </Text>
+        ) : null}
       </View>
 
-      <Pressable style={styles.primaryButton} onPress={() => router.push('/login')}>
-        <Text style={styles.primaryButtonText}>Ingresar</Text>
-      </Pressable>
+      {isLoggedIn ? (
+        <View style={styles.actions}>
+          <View style={styles.summaryGrid}>
+            {dashboard.actions.map((action) => (
+              <View key={action} style={styles.summaryCard}>
+                <Text style={styles.summaryText}>{action}</Text>
+              </View>
+            ))}
+          </View>
+          <Pressable style={styles.primaryButton} onPress={() => router.push('/cursos')}>
+            <Text style={styles.primaryButtonText}>Ver cursos</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={() => router.push('/biblia')}>
+            <Text style={styles.secondaryButtonText}>Ver biblia</Text>
+          </Pressable>
+          <Pressable
+            disabled={logoutMutation.isPending}
+            style={[styles.ghostButton, logoutMutation.isPending && styles.disabledButton]}
+            onPress={() => logoutMutation.mutate()}
+          >
+            <Text style={styles.ghostButtonText}>
+              {logoutMutation.isPending ? 'Cerrando...' : 'Cerrar sesion'}
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable style={styles.primaryButton} onPress={() => router.push('/login')}>
+          <Text style={styles.primaryButtonText}>Ingresar</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -54,6 +158,63 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
+  roleBadge: {
+    backgroundColor: '#e8f1ff',
+    borderRadius: 8,
+    color: '#1b4f91',
+    fontSize: 13,
+    fontWeight: '800',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    textTransform: 'uppercase',
+  },
+  sessionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  sessionText: {
+    color: '#516070',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  error: {
+    color: '#b42318',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  actions: {
+    gap: 10,
+    marginTop: 18,
+    width: '100%',
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    width: '100%',
+  },
+  summaryCard: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#dce2ea',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexGrow: 1,
+    minWidth: '30%',
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+  },
+  summaryText: {
+    color: '#2f3947',
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: '#1b6fd7',
@@ -67,5 +228,34 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '800',
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#c3cfdd',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    width: '100%',
+  },
+  secondaryButtonText: {
+    color: '#151922',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  ghostButton: {
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    width: '100%',
+  },
+  ghostButtonText: {
+    color: '#516070',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  disabledButton: {
+    opacity: 0.65,
   },
 });
