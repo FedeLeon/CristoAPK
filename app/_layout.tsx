@@ -22,6 +22,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import { BackHandler, Image, Platform, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logout, me } from '../src/api/auth';
+import { getChats } from '../src/api/chats';
 import { getMeetings } from '../src/api/meetings';
 import { getNotifications, markNotificationsRead } from '../src/api/notifications';
 import { getAuthToken } from '../src/auth/tokenStorage';
@@ -35,6 +36,7 @@ import {
   scheduleMeetingReminders,
   setupAndroidNotificationChannel,
 } from '../src/notifications/mobileNotifications';
+import { notifyUnreadBrowserChatMessages } from '../src/notifications/webChatNotifications';
 
 type StackTransitionAnimation = 'slide_from_left' | 'slide_from_right';
 type BottomNavigationMode = 'push' | 'replace';
@@ -134,6 +136,13 @@ function GlobalMobileNotifications() {
     enabled: Boolean(tokenQuery.data && meQuery.data),
   });
 
+  const chatsQuery = useQuery({
+    queryKey: ['chats'],
+    queryFn: getChats,
+    enabled: Boolean(tokenQuery.data && meQuery.data),
+    refetchInterval: Platform.OS === 'web' ? 15000 : false,
+  });
+
   useEffect(() => {
     setupAndroidNotificationChannel();
     const subscription = observeNotificationResponses();
@@ -156,6 +165,14 @@ function GlobalMobileNotifications() {
 
     scheduleMeetingReminders(meetingsQuery.data);
   }, [meetingsQuery.data]);
+
+  useEffect(() => {
+    if (!chatsQuery.data || !meQuery.data) {
+      return;
+    }
+
+    notifyUnreadBrowserChatMessages(chatsQuery.data, meQuery.data.id);
+  }, [chatsQuery.data, meQuery.data]);
 
   return null;
 }
@@ -537,6 +554,14 @@ function getBottomSectionIndex(pathname: string): number | null {
   return null;
 }
 
+function isUnreadMeetingNotification(notification: { read_at?: string | null; type: string; url?: string | null }) {
+  if (notification.read_at) {
+    return false;
+  }
+
+  return notification.url?.startsWith('/reuniones') || notification.type.toLowerCase().includes('meeting');
+}
+
 function BottomNavigation({
   onDirectionalNavigate,
 }: {
@@ -557,7 +582,24 @@ function BottomNavigation({
     enabled: Boolean(tokenQuery.data),
   });
 
+  const chatsQuery = useQuery({
+    queryKey: ['chats'],
+    queryFn: getChats,
+    enabled: Boolean(tokenQuery.data && meQuery.data),
+    refetchInterval: 15000,
+  });
+
+  const notificationsQuery = useQuery({
+    queryKey: ['notifications'],
+    queryFn: getNotifications,
+    enabled: Boolean(tokenQuery.data && meQuery.data),
+    refetchInterval: 15000,
+  });
+
   const isLoggedIn = Boolean(tokenQuery.data && meQuery.data);
+  const unreadChatCount = chatsQuery.data?.reduce((total, conversation) => total + (conversation.unread_count ?? 0), 0) ?? 0;
+  const unreadMeetingNotificationCount = notificationsQuery.data?.data.filter(isUnreadMeetingNotification).length ?? 0;
+  const meetingsBadgeCount = unreadChatCount + unreadMeetingNotificationCount;
   const isStudent = meQuery.data?.role === 'student';
   const isTutor = meQuery.data?.role === 'tutor';
   const isAdmin = meQuery.data?.role === 'admin' || meQuery.data?.role === 'superadmin';
@@ -733,6 +775,11 @@ function BottomNavigation({
           }
         >
           <CalendarDays color={isMeetingsActive || openMenu === 'meetings' ? '#ffffff' : '#d7e6f3'} size={22} strokeWidth={2.2} />
+          {meetingsBadgeCount > 0 ? (
+            <View style={styles.bottomNavBadge}>
+              <Text style={styles.bottomNavBadgeText}>{meetingsBadgeCount > 99 ? '99+' : meetingsBadgeCount}</Text>
+            </View>
+          ) : null}
           <Text
             adjustsFontSizeToFit
             minimumFontScale={0.78}
@@ -1036,6 +1083,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingHorizontal: 4,
     paddingVertical: 6,
+    position: 'relative',
   },
   bottomNavItemActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
@@ -1079,6 +1127,24 @@ const styles = StyleSheet.create({
   },
   bottomNavTextActive: {
     color: '#ffffff',
+  },
+  bottomNavBadge: {
+    alignItems: 'center',
+    backgroundColor: '#dc2626',
+    borderColor: '#ffffff',
+    borderRadius: 9,
+    borderWidth: 1,
+    minWidth: 18,
+    paddingHorizontal: 4,
+    position: 'absolute',
+    right: 12,
+    top: 4,
+  },
+  bottomNavBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '900',
+    lineHeight: 14,
   },
   dropdownMenu: {
     backgroundColor: '#0f2d4d',

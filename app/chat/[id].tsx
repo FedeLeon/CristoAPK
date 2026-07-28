@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { me } from '../../src/api/auth';
 import { getChat, sendChatMessage } from '../../src/api/chats';
@@ -31,6 +31,14 @@ export default function ChatDetailScreen() {
       await queryClient.invalidateQueries({ queryKey: ['chats'] });
     },
   });
+
+  useEffect(() => {
+    if (!chatQuery.data) {
+      return;
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['chats'] });
+  }, [chatQuery.data, queryClient]);
 
   if (chatQuery.isLoading || meQuery.isLoading) {
     return (

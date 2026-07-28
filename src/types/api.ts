@@ -131,6 +131,7 @@ export const chatConversationSchema = z.object({
   id: z.number(),
   type: z.string(),
   title: z.string(),
+  unread_count: z.number().optional(),
   participants: z.array(userSchema).optional(),
   last_message: chatMessageSchema.nullable().optional(),
   messages: z.array(chatMessageSchema).optional(),

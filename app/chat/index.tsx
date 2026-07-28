@@ -81,10 +81,17 @@ export default function ChatScreen() {
       }
       renderItem={({ item }) => (
         <Link href={`/chat/${item.id}`} asChild>
-          <Pressable style={styles.card}>
+          <Pressable style={StyleSheet.flatten([styles.card, Boolean(item.unread_count) && styles.cardUnread])}>
             <ChatAvatar conversation={item} currentUserId={meQuery.data?.id} />
             <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
+              <View style={styles.cardTitleRow}>
+                <Text numberOfLines={1} style={styles.cardTitle}>{item.title}</Text>
+                {item.unread_count ? (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{item.unread_count > 99 ? '99+' : item.unread_count}</Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={styles.meta}>{item.type === 'group' ? 'Grupo' : 'Directo'}</Text>
               {item.last_message ? (
                 <Text numberOfLines={2} style={styles.text}>
@@ -161,6 +168,10 @@ const styles = StyleSheet.create({
     gap: 7,
     padding: 16,
   },
+  cardUnread: {
+    borderColor: '#93c5fd',
+    borderWidth: 2,
+  },
   cardContent: {
     flex: 1,
     gap: 7,
@@ -193,8 +204,27 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     color: '#151922',
+    flex: 1,
     fontSize: 18,
     fontWeight: '800',
+  },
+  cardTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  unreadBadge: {
+    alignItems: 'center',
+    backgroundColor: '#dc2626',
+    borderRadius: 9,
+    minWidth: 18,
+    paddingHorizontal: 5,
+  },
+  unreadBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 16,
   },
   meta: {
     color: '#1b6fd7',
