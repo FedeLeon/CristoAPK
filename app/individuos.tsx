@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -37,6 +36,7 @@ import {
 } from '../src/api/adminIndividuals';
 import { me } from '../src/api/auth';
 import { getApiErrorMessage } from '../src/api/client';
+import { AppModal } from '../src/components/AppModal';
 import { ScreenTitle } from '../src/components/ScreenTitle';
 import { AdminIndividual, AdminIndividualRole, AdminIndividualStatus } from '../src/types/api';
 
@@ -267,43 +267,50 @@ export default function AdminIndividualsScreen() {
         ) : null}
       </ScrollView>
 
-      <Modal animationType="fade" transparent visible={Boolean(selectedUser)} onRequestClose={() => setSelectedUser(null)}>
-        <View style={styles.centeredModalBackdrop}>
-          <View style={styles.actionSheetCard}>
-            {selectedUser ? (
-              <IndividualActionModal
-                busy={toggleStatusMutation.isPending || deleteMutation.isPending}
-                mode={detailMode}
-                onBack={() => setDetailMode('actions')}
-                onClose={() => setSelectedUser(null)}
-                onDelete={() =>
-                  confirmDeleteUser(selectedUser, (id) => {
-                    setSelectedUser(null);
-                    deleteMutation.mutate(id);
-                  })
-                }
-                onEdit={() => {
-                  setEditingUser(selectedUser);
-                  setForm(formFromUser(selectedUser));
-                  setSelectedUser(null);
-                }}
-                onModeChange={setDetailMode}
-                onToggleStatus={() =>
-                  confirmToggleStatus(selectedUser, (id) => {
-                    setSelectedUser(null);
-                    toggleStatusMutation.mutate(id);
-                  })
-                }
-                user={selectedUser}
-              />
-            ) : null}
-          </View>
-        </View>
-      </Modal>
+      <AppModal
+        backdropStyle={styles.centeredModalBackdrop}
+        contentStyle={styles.actionSheetCard}
+        onClose={() => setSelectedUser(null)}
+        transition="scale"
+        visible={Boolean(selectedUser)}
+      >
+        {selectedUser ? (
+          <IndividualActionModal
+            busy={toggleStatusMutation.isPending || deleteMutation.isPending}
+            mode={detailMode}
+            onBack={() => setDetailMode('actions')}
+            onClose={() => setSelectedUser(null)}
+            onDelete={() =>
+              confirmDeleteUser(selectedUser, (id) => {
+                setSelectedUser(null);
+                deleteMutation.mutate(id);
+              })
+            }
+            onEdit={() => {
+              setEditingUser(selectedUser);
+              setForm(formFromUser(selectedUser));
+              setSelectedUser(null);
+            }}
+            onModeChange={setDetailMode}
+            onToggleStatus={() =>
+              confirmToggleStatus(selectedUser, (id) => {
+                setSelectedUser(null);
+                toggleStatusMutation.mutate(id);
+              })
+            }
+            user={selectedUser}
+          />
+        ) : null}
+      </AppModal>
 
-      <Modal animationType="slide" transparent visible={Boolean(editingUser && form)} onRequestClose={() => setEditingUser(null)}>
-        <View style={styles.centeredModalBackdrop}>
-          <ScrollView contentContainerStyle={styles.centeredModalCard} style={styles.centeredModalScroll}>
+      <AppModal
+        backdropStyle={styles.centeredModalBackdrop}
+        contentStyle={styles.centeredModalScroll}
+        onClose={() => setEditingUser(null)}
+        transition="slide-right"
+        visible={Boolean(editingUser && form)}
+      >
+        <ScrollView contentContainerStyle={styles.centeredModalCard}>
             {editingUser && form ? (
               <>
                 <View style={styles.modalHeaderRow}>
@@ -392,9 +399,8 @@ export default function AdminIndividualsScreen() {
                 />
               </>
             ) : null}
-          </ScrollView>
-        </View>
-      </Modal>
+        </ScrollView>
+      </AppModal>
     </>
   );
 }
@@ -775,20 +781,22 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   centeredModalBackdrop: {
-    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    backgroundColor: 'rgba(15, 23, 42, 0.28)',
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    padding: 18,
   },
   centeredModalCard: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    borderRadius: 8,
     gap: 12,
     padding: 18,
     paddingBottom: 28,
+    width: '100%',
   },
   centeredModalScroll: {
-    maxHeight: '92%',
+    maxHeight: '90%',
+    width: '100%',
   },
   center: {
     alignItems: 'center',
@@ -960,12 +968,13 @@ const styles = StyleSheet.create({
   },
   actionSheetCard: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    borderRadius: 8,
     gap: 14,
     maxHeight: '88%',
+    overflow: 'hidden',
     padding: 18,
     paddingBottom: 28,
+    width: '100%',
   },
   actionSheetHeader: {
     alignItems: 'flex-start',
@@ -1012,7 +1021,9 @@ const styles = StyleSheet.create({
     color: '#b42318',
   },
   detailScroll: {
-    maxHeight: 520,
+    flexShrink: 1,
+    maxHeight: '100%',
+    width: '100%',
   },
   detailScrollContent: {
     gap: 12,

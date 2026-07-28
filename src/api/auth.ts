@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { clearAuthToken, setAuthToken } from '../auth/tokenStorage';
+import { registerDeviceForPushNotifications, unregisterDevicePushToken } from '../notifications/mobileNotifications';
 import { clearApiCache } from '../storage/localDb';
 import { extractApiData, loginResponseSchema, userSchema } from '../types/api';
 import { api } from './client';
@@ -43,6 +44,7 @@ export async function login(email: string, password: string) {
   const parsed = loginResponseSchema.parse(response.data);
 
   await setAuthToken(parsed.token);
+  await registerDeviceForPushNotifications();
 
   return parsed.user;
 }
@@ -53,6 +55,7 @@ export async function register(input: RegisterInput) {
 
   if (parsed.token) {
     await setAuthToken(parsed.token);
+    await registerDeviceForPushNotifications();
   }
 
   return parsed;
@@ -65,6 +68,7 @@ export async function forgotPassword(email: string) {
 
 export async function logout() {
   try {
+    await unregisterDevicePushToken();
     await api.post('/logout');
   } finally {
     await clearAuthToken();

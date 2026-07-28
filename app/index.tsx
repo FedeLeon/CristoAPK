@@ -6,6 +6,7 @@ import {
   Camera,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   FileText,
   GraduationCap,
@@ -20,7 +21,7 @@ import {
   UsersRound,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { me } from '../src/api/auth';
 import { getApiErrorMessage } from '../src/api/client';
 import {
@@ -33,6 +34,7 @@ import {
   type AdminAnnouncementInput,
 } from '../src/api/dashboard';
 import { getAuthToken } from '../src/auth/tokenStorage';
+import { AppModal } from '../src/components/AppModal';
 import { ScreenTitle } from '../src/components/ScreenTitle';
 import {
   ApiUser,
@@ -247,6 +249,7 @@ function AdminDashboardBlocks({
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<DashboardAdminAnnouncement | null>(null);
+  const [expandedAnnouncementIds, setExpandedAnnouncementIds] = useState<number[]>([]);
   const [form, setForm] = useState<AdminAnnouncementInput>(emptyAnnouncementForm);
 
   const refreshDashboard = async () => {
@@ -322,7 +325,7 @@ function AdminDashboardBlocks({
     );
   }
 
-  const announcements = data?.admin_announcements ?? [];
+  const announcements = (data?.admin_announcements ?? []).filter((announcement) => announcement.status === 'activo');
 
   return (
     <>
@@ -335,7 +338,7 @@ function AdminDashboardBlocks({
           </View>
           <View style={styles.blockHeaderText}>
             <Text style={styles.blockEyebrow}>Anuncios generales</Text>
-            <Text style={styles.blockTitle}>Crear y gestionar avisos de toda la app</Text>
+            <Text style={styles.blockTitle}>Anuncios activos</Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -356,6 +359,7 @@ function AdminDashboardBlocks({
               <AdminAnnouncementCard
                 announcement={announcement}
                 busy={statusMutation.isPending || deleteMutation.isPending}
+                expanded={expandedAnnouncementIds.includes(announcement.id)}
                 key={announcement.id}
                 onDelete={() => confirmDeleteAdminAnnouncement(announcement, deleteMutation.mutate)}
                 onEdit={() => {
@@ -376,90 +380,106 @@ function AdminDashboardBlocks({
                     status: announcement.status === 'activo' ? 'inactivo' : 'activo',
                   })
                 }
+                onToggleExpanded={() =>
+                  setExpandedAnnouncementIds((current) =>
+                    current.includes(announcement.id)
+                      ? current.filter((id) => id !== announcement.id)
+                      : [...current, announcement.id],
+                  )
+                }
               />
             ))}
           </View>
         ) : (
-          <Text style={styles.blockMeta}>No hay anuncios generales creados por este admin.</Text>
+          <Text style={styles.blockMeta}>No hay anuncios activos creados por este admin.</Text>
         )}
+
+        <Pressable accessibilityRole="button" style={styles.fullWidthButton} onPress={() => router.push('/admin-anuncios')}>
+          <Text style={styles.fullWidthButtonText}>Ver anuncios</Text>
+          <ChevronRight color="#ffffff" size={18} strokeWidth={2.4} />
+        </Pressable>
       </View>
 
-      <Modal animationType="slide" transparent visible={modalOpen} onRequestClose={() => setModalOpen(false)}>
-        <View style={styles.centeredModalBackdrop}>
-          <ScrollView contentContainerStyle={styles.centeredModalCard} style={styles.centeredModalScroll}>
-            <View style={styles.modalHeaderRow}>
-              <View>
-                <Text style={styles.modalTitle}>{editingAnnouncement ? 'Editar anuncio' : 'Nuevo anuncio'}</Text>
-                <Text style={styles.blockMeta}>Aviso general visible para toda la app.</Text>
-              </View>
-              <Pressable accessibilityRole="button" onPress={() => setModalOpen(false)} style={styles.smallLinkButton}>
-                <Text style={styles.smallLinkButtonText}>Cerrar</Text>
-              </Pressable>
+      <AppModal
+        backdropStyle={styles.centeredModalBackdrop}
+        contentStyle={styles.centeredModalScroll}
+        onClose={() => setModalOpen(false)}
+        transition="scale"
+        visible={modalOpen}
+      >
+        <ScrollView contentContainerStyle={styles.centeredModalCard}>
+          <View style={styles.modalHeaderRow}>
+            <View>
+              <Text style={styles.modalTitle}>{editingAnnouncement ? 'Editar anuncio' : 'Nuevo anuncio'}</Text>
+              <Text style={styles.blockMeta}>Aviso general visible para toda la app.</Text>
             </View>
+            <Pressable accessibilityRole="button" onPress={() => setModalOpen(false)} style={styles.smallLinkButton}>
+              <Text style={styles.smallLinkButtonText}>Cerrar</Text>
+            </Pressable>
+          </View>
 
-            <DashboardField label="Titulo" value={form.title} onChangeText={(title) => setForm({ ...form, title })} />
-            <DashboardField
-              label="Mensaje"
-              multiline
-              value={form.body}
-              onChangeText={(body) => setForm({ ...form, body })}
-            />
-            <DashboardField
-              label="Visible desde"
-              value={form.starts_at ?? ''}
-              onChangeText={(starts_at) => setForm({ ...form, starts_at })}
-            />
-            <DashboardField
-              label="Visible hasta"
-              value={form.ends_at ?? ''}
-              onChangeText={(ends_at) => setForm({ ...form, ends_at })}
-            />
-            <View style={styles.imagePickerBlock}>
-              <Text style={styles.inputLabel}>Imagen</Text>
-              {form.image?.uri ? (
-                <Image source={{ uri: form.image.uri }} style={styles.modalImagePreview} />
-              ) : editingAnnouncement?.image_url ? (
-                <Image source={{ uri: editingAnnouncement.image_url }} style={styles.modalImagePreview} />
-              ) : null}
-              <Pressable accessibilityRole="button" style={styles.imagePickerButton} onPress={pickImage}>
-                <Camera color="#1b6fd7" size={17} strokeWidth={2.2} />
-                <Text style={styles.imagePickerButtonText}>{form.image ? 'Cambiar imagen' : 'Elegir imagen'}</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.inputLabel}>Estado</Text>
-            <View style={styles.choiceWrap}>
-              <DashboardChoice label="Activo" selected={form.status !== 'inactivo'} onPress={() => setForm({ ...form, status: 'activo' })} />
-              <DashboardChoice label="Inactivo" selected={form.status === 'inactivo'} onPress={() => setForm({ ...form, status: 'inactivo' })} />
-            </View>
+          <DashboardField label="Titulo" value={form.title} onChangeText={(title) => setForm({ ...form, title })} />
+          <DashboardField
+            label="Mensaje"
+            multiline
+            value={form.body}
+            onChangeText={(body) => setForm({ ...form, body })}
+          />
+          <DashboardField
+            label="Visible desde"
+            value={form.starts_at ?? ''}
+            onChangeText={(starts_at) => setForm({ ...form, starts_at })}
+          />
+          <DashboardField
+            label="Visible hasta"
+            value={form.ends_at ?? ''}
+            onChangeText={(ends_at) => setForm({ ...form, ends_at })}
+          />
+          <View style={styles.imagePickerBlock}>
+            <Text style={styles.inputLabel}>Imagen</Text>
+            {form.image?.uri ? (
+              <Image source={{ uri: form.image.uri }} style={styles.modalImagePreview} />
+            ) : editingAnnouncement?.image_url ? (
+              <Image source={{ uri: editingAnnouncement.image_url }} style={styles.modalImagePreview} />
+            ) : null}
+            <Pressable accessibilityRole="button" style={styles.imagePickerButton} onPress={pickImage}>
+              <Camera color="#1b6fd7" size={17} strokeWidth={2.2} />
+              <Text style={styles.imagePickerButtonText}>{form.image ? 'Cambiar imagen' : 'Elegir imagen'}</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.inputLabel}>Estado</Text>
+          <View style={styles.choiceWrap}>
+            <DashboardChoice label="Activo" selected={form.status !== 'inactivo'} onPress={() => setForm({ ...form, status: 'activo' })} />
+            <DashboardChoice label="Inactivo" selected={form.status === 'inactivo'} onPress={() => setForm({ ...form, status: 'inactivo' })} />
+          </View>
 
-            {saveMutation.isError ? <Text style={styles.error}>{getApiErrorMessage(saveMutation.error)}</Text> : null}
-            <View style={styles.modalActions}>
-              <Pressable disabled={saveMutation.isPending} style={styles.cancelButton} onPress={() => setModalOpen(false)}>
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </Pressable>
-              <Pressable
-                disabled={saveMutation.isPending}
-                style={StyleSheet.flatten([styles.primaryModalButton, saveMutation.isPending && styles.disabled])}
-                onPress={() =>
-                  saveMutation.mutate({
-                    id: editingAnnouncement?.id,
-                    input: {
-                      ...form,
-                      body: form.body.trim(),
-                      ends_at: form.ends_at?.trim() || null,
-                      starts_at: form.starts_at?.trim() || null,
-                      title: form.title.trim(),
-                    },
-                  })
-                }
-              >
-                {saveMutation.isPending ? <ActivityIndicator color="#ffffff" /> : <CheckCircle2 color="#ffffff" size={18} strokeWidth={2.3} />}
-                <Text style={styles.primaryModalButtonText}>{saveMutation.isPending ? 'Guardando...' : 'Guardar'}</Text>
-              </Pressable>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
+          {saveMutation.isError ? <Text style={styles.error}>{getApiErrorMessage(saveMutation.error)}</Text> : null}
+          <View style={styles.modalActions}>
+            <Pressable disabled={saveMutation.isPending} style={styles.cancelButton} onPress={() => setModalOpen(false)}>
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </Pressable>
+            <Pressable
+              disabled={saveMutation.isPending}
+              style={StyleSheet.flatten([styles.primaryModalButton, saveMutation.isPending && styles.disabled])}
+              onPress={() =>
+                saveMutation.mutate({
+                  id: editingAnnouncement?.id,
+                  input: {
+                    ...form,
+                    body: form.body.trim(),
+                    ends_at: form.ends_at?.trim() || null,
+                    starts_at: form.starts_at?.trim() || null,
+                    title: form.title.trim(),
+                  },
+                })
+              }
+            >
+              {saveMutation.isPending ? <ActivityIndicator color="#ffffff" /> : <CheckCircle2 color="#ffffff" size={18} strokeWidth={2.3} />}
+              <Text style={styles.primaryModalButtonText}>{saveMutation.isPending ? 'Guardando...' : 'Guardar'}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </AppModal>
     </>
   );
 }
@@ -501,45 +521,62 @@ function AdminMetricsBlock({ metrics }: { metrics: DashboardAdminMetric[] }) {
 function AdminAnnouncementCard({
   announcement,
   busy,
+  expanded,
   onDelete,
   onEdit,
+  onToggleExpanded,
   onToggleStatus,
 }: {
   announcement: DashboardAdminAnnouncement;
   busy: boolean;
+  expanded: boolean;
   onDelete: () => void;
   onEdit: () => void;
+  onToggleExpanded: () => void;
   onToggleStatus: () => void;
 }) {
   const inactive = announcement.status !== 'activo';
 
   return (
     <View style={styles.announcementCard}>
-      <View style={styles.announcementTitleRow}>
-        <Text style={styles.announcementTitle}>{announcement.title}</Text>
-        <Text style={StyleSheet.flatten([styles.statusPill, inactive ? styles.statusPillRead : styles.statusPillNew])}>
-          {announcement.status_label}
-        </Text>
-      </View>
-      <Text numberOfLines={3} style={styles.announcementBody}>{announcement.body}</Text>
-      {announcement.image_url ? <Image source={{ uri: announcement.image_url }} style={styles.announcementImage} /> : null}
-      <Text style={styles.blockMeta}>
-        {announcement.starts_at ? `Desde ${announcement.starts_at}` : 'Sin fecha inicial'}
-        {announcement.ends_at ? ` - Hasta ${announcement.ends_at}` : ''}
-      </Text>
-      <View style={styles.adminAnnouncementActions}>
-        <Pressable style={styles.inlineButton} onPress={onEdit}>
-          <Pencil color="#1b6fd7" size={16} strokeWidth={2.2} />
-          <Text style={styles.inlineButtonText}>Editar</Text>
-        </Pressable>
-        <Pressable disabled={busy} style={StyleSheet.flatten([styles.inlineButton, busy && styles.disabled])} onPress={onToggleStatus}>
-          <Unlock color="#1b6fd7" size={16} strokeWidth={2.2} />
-          <Text style={styles.inlineButtonText}>{inactive ? 'Activar' : 'Inactivar'}</Text>
-        </Pressable>
-        <Pressable disabled={busy} style={StyleSheet.flatten([styles.inlineDangerButton, busy && styles.disabled])} onPress={onDelete}>
-          <Trash2 color="#b42318" size={16} strokeWidth={2.2} />
-        </Pressable>
-      </View>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={onToggleExpanded} style={styles.collapsedAnnouncementHeader}>
+        <View style={styles.collapsedAnnouncementText}>
+          <View style={styles.announcementTitleRow}>
+            <Text style={styles.announcementTitle}>{announcement.title}</Text>
+            <Text style={StyleSheet.flatten([styles.statusPill, inactive ? styles.statusPillRead : styles.statusPillNew])}>
+              {announcement.status_label}
+            </Text>
+          </View>
+          <Text numberOfLines={1} style={styles.blockMeta}>
+            {announcement.starts_at ? `Desde ${announcement.starts_at}` : 'Sin fecha inicial'}
+            {announcement.ends_at ? ` - Hasta ${announcement.ends_at}` : ''}
+          </Text>
+        </View>
+        {expanded ? (
+          <ChevronDown color="#1b6fd7" size={20} strokeWidth={2.3} />
+        ) : (
+          <ChevronRight color="#1b6fd7" size={20} strokeWidth={2.3} />
+        )}
+      </Pressable>
+      {expanded ? (
+        <>
+          <Text style={styles.announcementBody}>{announcement.body}</Text>
+          {announcement.image_url ? <Image source={{ uri: announcement.image_url }} style={styles.announcementImage} /> : null}
+          <View style={styles.adminAnnouncementActions}>
+            <Pressable style={styles.inlineButton} onPress={onEdit}>
+              <Pencil color="#1b6fd7" size={16} strokeWidth={2.2} />
+              <Text style={styles.inlineButtonText}>Editar</Text>
+            </Pressable>
+            <Pressable disabled={busy} style={StyleSheet.flatten([styles.inlineButton, busy && styles.disabled])} onPress={onToggleStatus}>
+              <Unlock color="#1b6fd7" size={16} strokeWidth={2.2} />
+              <Text style={styles.inlineButtonText}>{inactive ? 'Activar' : 'Inactivar'}</Text>
+            </Pressable>
+            <Pressable disabled={busy} style={StyleSheet.flatten([styles.inlineDangerButton, busy && styles.disabled])} onPress={onDelete}>
+              <Trash2 color="#b42318" size={16} strokeWidth={2.2} />
+            </Pressable>
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -1105,6 +1142,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
+  fullWidthButton: {
+    alignItems: 'center',
+    backgroundColor: '#1b6fd7',
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    width: '100%',
+  },
+  fullWidthButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
+  },
   unreadBadge: {
     alignItems: 'center',
     backgroundColor: '#b42318',
@@ -1131,6 +1185,17 @@ const styles = StyleSheet.create({
   },
   announcementOpenArea: {
     gap: 8,
+  },
+  collapsedAnnouncementHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  collapsedAnnouncementText: {
+    flex: 1,
+    gap: 5,
+    minWidth: 0,
   },
   announcementCardUnread: {
     backgroundColor: '#f7fbff',
@@ -1204,7 +1269,8 @@ const styles = StyleSheet.create({
   centeredModalBackdrop: {
     backgroundColor: 'rgba(15, 23, 42, 0.42)',
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    padding: 18,
   },
   centeredModalCard: {
     backgroundColor: '#ffffff',

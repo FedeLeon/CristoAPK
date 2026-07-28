@@ -27,6 +27,13 @@ export async function markDashboardAnnouncementRead(id: number) {
   await api.post(`/dashboard/anuncios/${id}/leido`);
 }
 
+const adminAnnouncementsResponseSchema = z.array(dashboardAdminAnnouncementSchema);
+
+export async function getAdminAnnouncements() {
+  const response = await api.get('/admin/anuncios');
+  return adminAnnouncementsResponseSchema.parse(extractApiData(response.data));
+}
+
 export type AdminAnnouncementInput = {
   body: string;
   ends_at?: string | null;

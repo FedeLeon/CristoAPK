@@ -116,11 +116,14 @@ export default function LoginScreen() {
               <Text style={styles.label}>Email</Text>
               <TextInput
                 autoCapitalize="none"
-                autoComplete="email"
+                autoComplete="off"
+                autoCorrect={false}
+                importantForAutofill="no"
                 keyboardType="email-address"
                 onChangeText={setEmail}
-                placeholder="usuario@example.com"
+                spellCheck={false}
                 style={styles.input}
+                textContentType="none"
                 value={email}
               />
             </View>
@@ -132,11 +135,14 @@ export default function LoginScreen() {
           <View style={styles.passwordInput}>
             <TextInput
               autoCapitalize="none"
-              autoComplete="password"
+              autoComplete="off"
+              autoCorrect={false}
+              importantForAutofill="no"
               onChangeText={setPassword}
-              placeholder="usuario1234"
               secureTextEntry={!showPassword}
+              spellCheck={false}
               style={styles.passwordTextInput}
+              textContentType="none"
               value={password}
             />
             <Pressable

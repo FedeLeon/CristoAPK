@@ -41,7 +41,14 @@
           "style": "dark"
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "color": "#12365c",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "extra": {
       "router": {},

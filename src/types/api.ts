@@ -380,6 +380,36 @@ export const adminIndividualsResponseSchema = z.object({
   tutors: z.array(adminIndividualSummarySchema),
 });
 
+export const adminPastoralCourseSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  subtitle: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  duration: z.string().nullable().optional(),
+  level: z.string().nullable().optional(),
+  publication_status: z.string().nullable().optional(),
+  image_url: z.string().nullable().optional(),
+  modules_count: z.number().optional(),
+  lessons_count: z.number().optional(),
+  created_at: z.string().nullable().optional(),
+});
+
+export const adminDownloadableMaterialSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  description: z.string().nullable().optional(),
+  type: z.string(),
+  type_label: z.string(),
+  original_name: z.string().nullable().optional(),
+  mime: z.string().nullable().optional(),
+  size: z.number().optional(),
+  url: z.string().nullable().optional(),
+  thumb_url: z.string().nullable().optional(),
+  is_published: z.boolean(),
+  published_at: z.string().nullable().optional(),
+  created_by: z.string().nullable().optional(),
+});
+
 export type ApiUser = z.infer<typeof userSchema>;
 export type Course = z.infer<typeof courseSchema>;
 export type CourseModule = z.infer<typeof courseModuleSchema>;
@@ -407,6 +437,8 @@ export type AdminIndividual = z.infer<typeof adminIndividualSchema>;
 export type AdminIndividualRole = z.infer<typeof adminIndividualRoleSchema>;
 export type AdminIndividualStatus = z.infer<typeof adminIndividualStatusSchema>;
 export type AdminIndividualsResponse = z.infer<typeof adminIndividualsResponseSchema>;
+export type AdminPastoralCourse = z.infer<typeof adminPastoralCourseSchema>;
+export type AdminDownloadableMaterial = z.infer<typeof adminDownloadableMaterialSchema>;
 
 export function extractApiData<T>(payload: T | { data: T }): T {
   if (payload && typeof payload === 'object' && 'data' in payload) {

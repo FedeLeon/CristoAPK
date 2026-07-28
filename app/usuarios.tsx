@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -44,6 +43,7 @@ import {
   type UpdateTutorPastoralProfileInput,
 } from '../src/api/tutorUsers';
 import { getTutorUsers } from '../src/api/tutorUsers';
+import { AppModal } from '../src/components/AppModal';
 import { ScreenTitle } from '../src/components/ScreenTitle';
 import { TutorGroup, TutorPastoralAnalysisResponse, TutorStudent } from '../src/types/api';
 
@@ -354,45 +354,52 @@ export default function TutorUsersScreen() {
         )}
       </ScrollView>
 
-      <Modal animationType="slide" transparent visible={studentModalOpen} onRequestClose={() => setStudentModalOpen(false)}>
-        <View style={styles.centeredModalBackdrop}>
-          <View style={styles.centeredModalCard}>
-            <Text style={styles.modalTitle}>Nuevo usuario</Text>
-            <Field label="Nombre" value={studentForm.name} onChangeText={(name) => setStudentForm({ ...studentForm, name })} />
-            <Field
-              label="Apellido"
-              value={studentForm.last_name}
-              onChangeText={(last_name) => setStudentForm({ ...studentForm, last_name })}
-            />
-            <Field
-              autoCapitalize="none"
-              keyboardType="email-address"
-              label="Email"
-              value={studentForm.email}
-              onChangeText={(email) => setStudentForm({ ...studentForm, email })}
-            />
-            <Field
-              label="Contrasena"
-              secureTextEntry
-              value={studentForm.password}
-              onChangeText={(password) => setStudentForm({ ...studentForm, password })}
-            />
-            {createStudentMutation.isError ? (
-              <Text style={styles.error}>{getApiErrorMessage(createStudentMutation.error)}</Text>
-            ) : null}
-            <ModalActions
-              busy={createStudentMutation.isPending}
-              onCancel={() => setStudentModalOpen(false)}
-              onSave={() => createStudentMutation.mutate(studentForm)}
-              saveLabel="Crear"
-            />
-          </View>
-        </View>
-      </Modal>
+      <AppModal
+        backdropStyle={styles.centeredModalBackdrop}
+        contentStyle={styles.centeredModalCard}
+        onClose={() => setStudentModalOpen(false)}
+        transition="slide-right"
+        visible={studentModalOpen}
+      >
+        <Text style={styles.modalTitle}>Nuevo usuario</Text>
+        <Field label="Nombre" value={studentForm.name} onChangeText={(name) => setStudentForm({ ...studentForm, name })} />
+        <Field
+          label="Apellido"
+          value={studentForm.last_name}
+          onChangeText={(last_name) => setStudentForm({ ...studentForm, last_name })}
+        />
+        <Field
+          autoCapitalize="none"
+          keyboardType="email-address"
+          label="Email"
+          value={studentForm.email}
+          onChangeText={(email) => setStudentForm({ ...studentForm, email })}
+        />
+        <Field
+          label="Contrasena"
+          secureTextEntry
+          value={studentForm.password}
+          onChangeText={(password) => setStudentForm({ ...studentForm, password })}
+        />
+        {createStudentMutation.isError ? (
+          <Text style={styles.error}>{getApiErrorMessage(createStudentMutation.error)}</Text>
+        ) : null}
+        <ModalActions
+          busy={createStudentMutation.isPending}
+          onCancel={() => setStudentModalOpen(false)}
+          onSave={() => createStudentMutation.mutate(studentForm)}
+          saveLabel="Crear"
+        />
+      </AppModal>
 
-      <Modal animationType="slide" transparent visible={groupModalOpen} onRequestClose={() => setGroupModalOpen(false)}>
-        <View style={styles.centeredModalBackdrop}>
-          <ScrollView contentContainerStyle={styles.centeredModalCard} style={styles.centeredModalScroll}>
+      <AppModal
+        backdropStyle={styles.centeredModalBackdrop}
+        contentStyle={styles.centeredModalScroll}
+        onClose={() => setGroupModalOpen(false)}
+        transition="slide-right"
+        visible={groupModalOpen}
+      >
+        <ScrollView contentContainerStyle={styles.centeredModalCard}>
             <Text style={styles.modalTitle}>{groupForm.id ? 'Editar grupo' : 'Nuevo grupo'}</Text>
             <Field label="Nombre" value={groupForm.name} onChangeText={(name) => setGroupForm({ ...groupForm, name })} />
             <Field
@@ -461,13 +468,17 @@ export default function TutorUsersScreen() {
               onSave={() => saveGroupMutation.mutate(groupForm)}
               saveLabel="Guardar"
             />
-          </ScrollView>
-        </View>
-      </Modal>
+        </ScrollView>
+      </AppModal>
 
-      <Modal animationType="slide" transparent visible={Boolean(assignmentGroup)} onRequestClose={() => setAssignmentGroup(null)}>
-        <View style={styles.centeredModalBackdrop}>
-          <ScrollView contentContainerStyle={styles.centeredModalCard} style={styles.centeredModalScroll}>
+      <AppModal
+        backdropStyle={styles.centeredModalBackdrop}
+        contentStyle={styles.centeredModalScroll}
+        onClose={() => setAssignmentGroup(null)}
+        transition="slide-right"
+        visible={Boolean(assignmentGroup)}
+      >
+        <ScrollView contentContainerStyle={styles.centeredModalCard}>
             <Text style={styles.modalTitle}>Asignar usuarios</Text>
             <Text style={styles.muted}>{assignmentGroup?.name}</Text>
             {students.length ? (
@@ -514,51 +525,47 @@ export default function TutorUsersScreen() {
               }
               saveLabel="Asignar"
             />
-          </ScrollView>
-        </View>
-      </Modal>
+        </ScrollView>
+      </AppModal>
 
-      <Modal
-        animationType="fade"
-        transparent
+      <AppModal
+        backdropStyle={styles.centeredModalBackdrop}
+        contentStyle={styles.studentActionCard}
+        onClose={() => setSelectedStudent(null)}
+        transition="scale"
         visible={Boolean(selectedStudent)}
-        onRequestClose={() => setSelectedStudent(null)}
       >
-        <View style={styles.centeredModalBackdrop}>
-          <View style={styles.studentActionCard}>
-            {selectedStudent ? (
-              <StudentActionModal
-                busy={updateStudentStatusMutation.isPending || deleteStudentMutation.isPending}
-                mode={studentDetailMode}
-                onBack={() => setStudentDetailMode('actions')}
-                onClose={() => setSelectedStudent(null)}
-                onDelete={() =>
-                  confirmDeleteStudent(selectedStudent, (id) => {
-                    setSelectedStudent(null);
-                    deleteStudentMutation.mutate(id);
-                  })
-                }
-                onModeChange={setStudentDetailMode}
-                onSavePastoralProfile={(input) =>
-                  updatePastoralProfileMutation.mutate({
-                    id: selectedStudent.id,
-                    input,
-                  })
-                }
-                onToggleStatus={() =>
-                  confirmToggleStudentStatus(selectedStudent, (id, status) => {
-                    setSelectedStudent(null);
-                    updateStudentStatusMutation.mutate({ id, status });
-                  })
-                }
-                pastoralSaveError={updatePastoralProfileMutation.error}
-                pastoralSaving={updatePastoralProfileMutation.isPending}
-                student={selectedStudent}
-              />
-            ) : null}
-          </View>
-        </View>
-      </Modal>
+        {selectedStudent ? (
+          <StudentActionModal
+            busy={updateStudentStatusMutation.isPending || deleteStudentMutation.isPending}
+            mode={studentDetailMode}
+            onBack={() => setStudentDetailMode('actions')}
+            onClose={() => setSelectedStudent(null)}
+            onDelete={() =>
+              confirmDeleteStudent(selectedStudent, (id) => {
+                setSelectedStudent(null);
+                deleteStudentMutation.mutate(id);
+              })
+            }
+            onModeChange={setStudentDetailMode}
+            onSavePastoralProfile={(input) =>
+              updatePastoralProfileMutation.mutate({
+                id: selectedStudent.id,
+                input,
+              })
+            }
+            onToggleStatus={() =>
+              confirmToggleStudentStatus(selectedStudent, (id, status) => {
+                setSelectedStudent(null);
+                updateStudentStatusMutation.mutate({ id, status });
+              })
+            }
+            pastoralSaveError={updatePastoralProfileMutation.error}
+            pastoralSaving={updatePastoralProfileMutation.isPending}
+            student={selectedStudent}
+          />
+        ) : null}
+      </AppModal>
     </>
   );
 }
