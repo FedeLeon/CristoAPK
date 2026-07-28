@@ -9,21 +9,23 @@ import { AdminPastoralCourse } from '../src/types/api';
 
 export default function AdminPastoralCoursesScreen() {
   const meQuery = useQuery({ queryKey: ['me'], queryFn: me });
+  const canReadPastoralCourses =
+    meQuery.data?.role === 'admin' || meQuery.data?.role === 'superadmin' || meQuery.data?.role === 'pastor';
   const coursesQuery = useQuery({
     queryKey: ['admin-pastoral-courses'],
     queryFn: getAdminPastoralCourses,
-    enabled: meQuery.data?.role === 'admin' || meQuery.data?.role === 'superadmin',
+    enabled: canReadPastoralCourses,
   });
 
   if (meQuery.isLoading) {
     return <CenteredState text="Cargando sesion..." />;
   }
 
-  if (meQuery.data?.role !== 'admin' && meQuery.data?.role !== 'superadmin') {
+  if (!canReadPastoralCourses) {
     return (
       <View style={styles.container}>
         <ScreenTitle icon="content" text="Cursos pastorales" />
-        <Text style={styles.error}>Esta seccion esta disponible solo para administradores.</Text>
+        <Text style={styles.error}>Esta seccion esta disponible para pastores y administradores.</Text>
       </View>
     );
   }
@@ -54,7 +56,7 @@ export default function AdminPastoralCoursesScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           <ScreenTitle icon="content" text="Examenes" />
-          <Text style={styles.muted}>Cursos pastorales creados desde la app web para pastores.</Text>
+          <Text style={styles.muted}>Cursos pastorales publicados para pastores.</Text>
         </View>
       }
       ListEmptyComponent={<EmptyCard text="Todavia no hay examenes pastorales cargados." />}

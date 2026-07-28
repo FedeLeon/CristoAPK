@@ -50,10 +50,12 @@ export default function AdminDownloadableMaterialsScreen() {
   const [previewMaterial, setPreviewMaterial] = useState<AdminDownloadableMaterial | null>(null);
 
   const meQuery = useQuery({ queryKey: ['me'], queryFn: me });
+  const canManageMaterials = meQuery.data?.role === 'admin' || meQuery.data?.role === 'superadmin';
+  const canReadMaterials = canManageMaterials || meQuery.data?.role === 'pastor';
   const materialsQuery = useQuery({
     queryKey: ['admin-downloadable-materials'],
     queryFn: getAdminDownloadableMaterials,
-    enabled: meQuery.data?.role === 'admin' || meQuery.data?.role === 'superadmin',
+    enabled: canReadMaterials,
   });
 
   const createMutation = useMutation({
@@ -176,11 +178,11 @@ export default function AdminDownloadableMaterialsScreen() {
     return <CenteredState text="Cargando sesion..." />;
   }
 
-  if (meQuery.data?.role !== 'admin' && meQuery.data?.role !== 'superadmin') {
+  if (!canReadMaterials) {
     return (
       <View style={styles.container}>
         <ScreenTitle icon="content" text="Contenido descargable" />
-        <Text style={styles.error}>Esta seccion esta disponible solo para administradores.</Text>
+        <Text style={styles.error}>Esta seccion esta disponible para pastores y administradores.</Text>
       </View>
     );
   }
@@ -215,10 +217,12 @@ export default function AdminDownloadableMaterialsScreen() {
               <View style={styles.headerTitle}>
                 <ScreenTitle icon="content" text="Contenido descargable" />
               </View>
-              <Pressable accessibilityRole="button" onPress={openCreateForm} style={styles.primaryButton}>
-                <Plus color="#ffffff" size={18} strokeWidth={2.4} />
-                <Text style={styles.primaryButtonText}>Nuevo</Text>
-              </Pressable>
+              {canManageMaterials ? (
+                <Pressable accessibilityRole="button" onPress={openCreateForm} style={styles.primaryButton}>
+                  <Plus color="#ffffff" size={18} strokeWidth={2.4} />
+                  <Text style={styles.primaryButtonText}>Nuevo</Text>
+                </Pressable>
+              ) : null}
             </View>
             <Text style={styles.muted}>Materiales publicados para pastores.</Text>
           </View>
@@ -227,6 +231,7 @@ export default function AdminDownloadableMaterialsScreen() {
         renderItem={({ item }) => (
           <MaterialCard
             material={item}
+            canManage={canManageMaterials}
             onEdit={() => openEditForm(item)}
             onPreview={() => setPreviewMaterial(item)}
           />
@@ -336,10 +341,12 @@ export default function AdminDownloadableMaterialsScreen() {
 }
 
 function MaterialCard({
+  canManage,
   material,
   onEdit,
   onPreview,
 }: {
+  canManage: boolean;
   material: AdminDownloadableMaterial;
   onEdit: () => void;
   onPreview: () => void;
@@ -382,10 +389,12 @@ function MaterialCard({
           <Download color="#151922" size={18} strokeWidth={2.2} />
           <Text style={styles.secondaryButtonText}>Descargar</Text>
         </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={onEdit}>
-          <Pencil color="#151922" size={18} strokeWidth={2.2} />
-          <Text style={styles.secondaryButtonText}>Editar</Text>
-        </Pressable>
+        {canManage ? (
+          <Pressable style={styles.secondaryButton} onPress={onEdit}>
+            <Pencil color="#151922" size={18} strokeWidth={2.2} />
+            <Text style={styles.secondaryButtonText}>Editar</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );

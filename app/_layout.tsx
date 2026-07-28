@@ -602,6 +602,7 @@ function BottomNavigation({
   const meetingsBadgeCount = unreadChatCount + unreadMeetingNotificationCount;
   const isStudent = meQuery.data?.role === 'student';
   const isTutor = meQuery.data?.role === 'tutor';
+  const isPastor = meQuery.data?.role === 'pastor';
   const isAdmin = meQuery.data?.role === 'admin' || meQuery.data?.role === 'superadmin';
   const isContentActive =
     pathname.startsWith('/cursos') ||
@@ -663,6 +664,12 @@ function BottomNavigation({
                   onPress={() => navigateFromBottomMenu('/contenido-descargable', 1)}
                 />
               </BottomMenuGroup>
+            </>
+          ) : isPastor ? (
+            <>
+              <BottomMenuItem icon={ClipboardCheck} label="Examenes" onPress={() => navigateFromBottomMenu('/cursos-pastorales', 1)} />
+              <BottomMenuItem icon={Download} label="Descargables" onPress={() => navigateFromBottomMenu('/contenido-descargable', 1)} />
+              <BottomMenuItem icon={BookOpen} label="Biblia" onPress={() => navigateFromBottomMenu('/biblia', 1)} />
             </>
           ) : (
             <>

@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ClipboardCheck,
+  Download,
   FileText,
   GraduationCap,
   IdCard,
@@ -69,6 +71,14 @@ function getRoleDashboard(user?: ApiUser) {
     };
   }
 
+  if (user.role === 'pastor') {
+    return {
+      label: 'Pastor',
+      title: 'Dashboard Pastor',
+      message: 'Bienvenido a tu espacio pastoral mobile.',
+    };
+  }
+
   return {
     label: 'Usuario',
     title: 'Dashboard Usuario',
@@ -101,11 +111,12 @@ export default function HomeScreen() {
   const isAdmin = meQuery.data?.role === 'admin' || meQuery.data?.role === 'superadmin';
   const isStudent = meQuery.data?.role === 'student';
   const isTutor = meQuery.data?.role === 'tutor';
+  const isPastor = meQuery.data?.role === 'pastor';
   const dashboard = getRoleDashboard(meQuery.data);
   const dashboardQuery = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboard,
-    enabled: Boolean(isLoggedIn && (isStudent || isTutor || isAdmin)),
+    enabled: Boolean(isLoggedIn && (isStudent || isTutor || isAdmin || isPastor)),
   });
   const markAnnouncementReadMutation = useMutation({
     mutationFn: markDashboardAnnouncementRead,
@@ -113,12 +124,20 @@ export default function HomeScreen() {
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
-  const quickActions = [
-    { icon: GraduationCap, label: 'Contenido general', route: '/cursos' },
-    { icon: BookOpen, label: 'Biblia', route: '/biblia' },
-    { icon: CalendarDays, label: 'Reuniones', route: '/reuniones' },
-    { icon: MessageCircle, label: 'Chat', route: '/chat' },
-  ] as const;
+  const quickActions = isPastor
+    ? ([
+        { icon: ClipboardCheck, label: 'Examenes', route: '/cursos-pastorales' },
+        { icon: Download, label: 'Descargables', route: '/contenido-descargable' },
+        { icon: BookOpen, label: 'Biblia', route: '/biblia' },
+        { icon: CalendarDays, label: 'Reuniones', route: '/reuniones' },
+        { icon: MessageCircle, label: 'Chat', route: '/chat' },
+      ] as const)
+    : ([
+        { icon: GraduationCap, label: 'Contenido general', route: '/cursos' },
+        { icon: BookOpen, label: 'Biblia', route: '/biblia' },
+        { icon: CalendarDays, label: 'Reuniones', route: '/reuniones' },
+        { icon: MessageCircle, label: 'Chat', route: '/chat' },
+      ] as const);
 
   return (
     <ScrollView
@@ -174,7 +193,7 @@ export default function HomeScreen() {
             />
           ) : null}
 
-          {isStudent || isTutor ? (
+          {isStudent || isTutor || isPastor ? (
             <DashboardBlocks
               data={dashboardQuery.data}
               error={dashboardQuery.error}
@@ -182,7 +201,7 @@ export default function HomeScreen() {
               isLoading={dashboardQuery.isLoading}
               markReadId={markAnnouncementReadMutation.variables}
               onMarkRead={(id) => markAnnouncementReadMutation.mutate(id)}
-              role={isTutor ? 'tutor' : 'student'}
+              role={isTutor ? 'tutor' : isPastor ? 'pastor' : 'student'}
             />
           ) : null}
 
@@ -626,7 +645,7 @@ function DashboardBlocks({
   isLoading: boolean;
   markReadId?: number;
   onMarkRead: (id: number) => void;
-  role: 'student' | 'tutor';
+  role: 'student' | 'tutor' | 'pastor';
 }) {
   if (isLoading) {
     return (
@@ -689,7 +708,9 @@ function DashboardBlocks({
           </View>
           <View style={styles.blockHeaderText}>
             <Text style={styles.blockEyebrow}>Anuncios</Text>
-            <Text style={styles.blockTitle}>{role === 'tutor' ? 'Avisos generales y de tus usuarios' : 'Avisos generales y de tu tutor'}</Text>
+            <Text style={styles.blockTitle}>
+              {role === 'tutor' ? 'Avisos generales y de tus usuarios' : role === 'pastor' ? 'Avisos pastorales' : 'Avisos generales y de tu tutor'}
+            </Text>
           </View>
           {data?.announcements.unread_count ? (
             <View style={styles.unreadBadge}>
