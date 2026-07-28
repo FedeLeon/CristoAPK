@@ -484,7 +484,7 @@ function DatePartInput({
       <TextInput
         keyboardType="number-pad"
         maxLength={maxLength}
-        placeholder={label === 'Año' ? 'AAAA' : '00'}
+        placeholder={label === 'Dia' ? 'DD' : label === 'Mes' ? 'MM' : 'AAAA'}
         placeholderTextColor="#94a3b8"
         style={styles.datePartInput}
         value={value}
