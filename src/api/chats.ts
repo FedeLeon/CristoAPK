@@ -1,10 +1,11 @@
 import axios from 'axios';
 import { z } from 'zod';
 import { readCache, writeCache } from '../storage/localDb';
-import { chatConversationSchema, extractApiData } from '../types/api';
+import { chatConversationSchema, extractApiData, userSchema } from '../types/api';
 import { api } from './client';
 
 const conversationsResponseSchema = z.array(chatConversationSchema);
+const chatCandidatesResponseSchema = z.array(userSchema);
 
 export async function getChats() {
   const cacheKey = 'chats:index';
@@ -42,6 +43,16 @@ export async function getChat(id: string | number) {
 
     throw error;
   }
+}
+
+export async function getChatCandidates() {
+  const response = await api.get('/chats/candidatos');
+  return chatCandidatesResponseSchema.parse(extractApiData(response.data));
+}
+
+export async function createDirectChat(userId: number) {
+  const response = await api.post('/chats/directo', { user_id: userId });
+  return chatConversationSchema.parse(extractApiData(response.data));
 }
 
 export async function sendChatMessage(id: string | number, body: string) {

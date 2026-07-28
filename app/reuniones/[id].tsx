@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { createElement } from 'react';
+import { createElement, useEffect } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { getApiErrorMessage } from '../../src/api/client';
 import { getMeetings } from '../../src/api/meetings';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ScreenTitle } from '../../src/components/ScreenTitle';
 
 function formatMeetingDate(value?: string | null) {
@@ -41,8 +41,74 @@ function buildMdsJitsiUrl(value: string, subject: string) {
   return `${baseUrl}#${brandedHash.join('&')}`;
 }
 
+const jitsiLeaveDetectorScript = `
+  (function () {
+    if (window.__mdsMeetingLeaveDetectorInstalled) {
+      return;
+    }
+
+    window.__mdsMeetingLeaveDetectorInstalled = true;
+
+    function notifyLeave() {
+      window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'meeting-left' }));
+    }
+
+    document.addEventListener('click', function (event) {
+      var target = event.target;
+      var button = target && target.closest ? target.closest('button,[role="button"]') : null;
+      var label = button ? (
+        button.getAttribute('aria-label') ||
+        button.getAttribute('data-testid') ||
+        button.textContent ||
+        ''
+      ).toLowerCase() : '';
+
+      if (
+        label.indexOf('hang up') !== -1 ||
+        label.indexOf('leave') !== -1 ||
+        label.indexOf('disconnect') !== -1 ||
+        label.indexOf('colgar') !== -1 ||
+        label.indexOf('salir') !== -1 ||
+        label.indexOf('desconectar') !== -1
+      ) {
+        setTimeout(notifyLeave, 180);
+      }
+    }, true);
+
+    window.addEventListener('beforeunload', notifyLeave);
+  })();
+  true;
+`;
+
 export default function MeetingRoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+
+  function goToMeetings() {
+    router.replace('/reuniones');
+  }
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      return;
+    }
+
+    function handleMessage(event: MessageEvent) {
+      const value = typeof event.data === 'string' ? event.data.toLowerCase() : '';
+
+      if (
+        value.includes('meeting-left') ||
+        value.includes('video-conference-left') ||
+        value.includes('readytoclose') ||
+        value.includes('hangup')
+      ) {
+        goToMeetings();
+      }
+    }
+
+    window.addEventListener('message', handleMessage);
+
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   const meetingsQuery = useQuery({
     queryKey: ['meetings'],
@@ -87,8 +153,15 @@ export default function MeetingRoomScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <ScreenTitle icon="meetings" size="medium" text={meeting.title} />
-        <Text style={styles.date}>{formatMeetingDate(meeting.scheduled_for)}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTitleBlock}>
+            <ScreenTitle icon="meetings" size="medium" text={meeting.title} />
+            <Text style={styles.date}>{formatMeetingDate(meeting.scheduled_for)}</Text>
+          </View>
+          <Pressable accessibilityRole="button" onPress={goToMeetings} style={styles.leaveButton}>
+            <Text style={styles.leaveButtonText}>Salir</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.room}>
@@ -106,8 +179,20 @@ export default function MeetingRoomScreen() {
             domStorageEnabled
             javaScriptCanOpenWindowsAutomatically
             javaScriptEnabled
+            injectedJavaScript={jitsiLeaveDetectorScript}
             mediaCapturePermissionGrantType="grant"
             mediaPlaybackRequiresUserAction={false}
+            onMessage={(event) => {
+              try {
+                const data = JSON.parse(event.nativeEvent.data) as { type?: string };
+
+                if (data.type === 'meeting-left') {
+                  goToMeetings();
+                }
+              } catch {
+                // Ignore unrelated Jitsi messages.
+              }
+            }}
             originWhitelist={['*']}
             source={{ uri: brandedRoomUrl }}
             startInLoadingState
@@ -150,6 +235,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  headerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  headerTitleBlock: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
   title: {
     color: '#151922',
     fontSize: 18,
@@ -159,6 +254,20 @@ const styles = StyleSheet.create({
     color: '#1b6fd7',
     fontSize: 13,
     fontWeight: '800',
+  },
+  leaveButton: {
+    alignItems: 'center',
+    backgroundColor: '#12365c',
+    borderRadius: 8,
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  leaveButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
   },
   muted: {
     color: '#606b7a',

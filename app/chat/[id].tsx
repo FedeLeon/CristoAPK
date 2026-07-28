@@ -32,6 +32,14 @@ export default function ChatDetailScreen() {
     },
   });
 
+  function submitMessage() {
+    if (!body.trim() || sendMutation.isPending) {
+      return;
+    }
+
+    sendMutation.mutate();
+  }
+
   useEffect(() => {
     if (!chatQuery.data) {
       return;
@@ -116,15 +124,19 @@ export default function ChatDetailScreen() {
         {sendMutation.isError ? <Text style={styles.error}>{getApiErrorMessage(sendMutation.error)}</Text> : null}
         <View style={styles.composerRow}>
           <TextInput
+            blurOnSubmit={false}
             multiline
             onChangeText={setBody}
+            onSubmitEditing={submitMessage}
             placeholder="Escribir mensaje..."
+            returnKeyType="send"
             style={styles.input}
+            submitBehavior="submit"
             value={body}
           />
           <Pressable
             disabled={!body.trim() || sendMutation.isPending}
-            onPress={() => sendMutation.mutate()}
+            onPress={submitMessage}
             style={[styles.sendButton, (!body.trim() || sendMutation.isPending) && styles.disabledButton]}
           >
             <Text style={styles.sendButtonText}>{sendMutation.isPending ? '...' : 'Enviar'}</Text>

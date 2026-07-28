@@ -107,6 +107,12 @@ export default function BibleScreen() {
   });
 
   const selectedChapter = chaptersQuery.data?.find((chapter) => String(chapter.id) === selectedChapterId);
+  const selectedChapterIndex = (chaptersQuery.data ?? []).findIndex((chapter) => String(chapter.id) === selectedChapterId);
+  const previousChapter = selectedChapterIndex > 0 ? chaptersQuery.data?.[selectedChapterIndex - 1] : null;
+  const nextChapter =
+    selectedChapterIndex >= 0 && chaptersQuery.data && selectedChapterIndex < chaptersQuery.data.length - 1
+      ? chaptersQuery.data[selectedChapterIndex + 1]
+      : null;
 
   useEffect(() => {
     if (selectedBookId || !routeBookId || !booksQuery.data) {
@@ -249,7 +255,14 @@ export default function BibleScreen() {
       {!selectedVersion ? (
         <VersionList versions={versionsQuery.data ?? []} onSelect={selectVersion} />
       ) : selectedBook && selectedChapter ? (
-        <ChapterReader book={selectedBook} chapter={selectedChapter} version={selectedVersion} />
+        <ChapterReader
+          book={selectedBook}
+          chapter={selectedChapter}
+          nextChapter={nextChapter ?? null}
+          onSelectChapter={selectChapter}
+          previousChapter={previousChapter ?? null}
+          version={selectedVersion}
+        />
       ) : selectedBook ? (
         <ChapterList
           book={selectedBook}
@@ -423,7 +436,21 @@ function ChapterList({
   );
 }
 
-function ChapterReader({ book, chapter, version }: { book: BibleBook; chapter: BibleChapter; version: BibleVersion }) {
+function ChapterReader({
+  book,
+  chapter,
+  nextChapter,
+  onSelectChapter,
+  previousChapter,
+  version,
+}: {
+  book: BibleBook;
+  chapter: BibleChapter;
+  nextChapter: BibleChapter | null;
+  onSelectChapter: (chapter: BibleChapter) => void;
+  previousChapter: BibleChapter | null;
+  version: BibleVersion;
+}) {
   const visual = chapterVisual(chapter.number);
   const Icon = visual.Icon;
 
@@ -455,6 +482,48 @@ function ChapterReader({ book, chapter, version }: { book: BibleBook; chapter: B
       </View>
 
       {chapter.verses.length === 0 ? <Text style={styles.emptyText}>No hay versiculos cargados para este capitulo.</Text> : null}
+
+      <View style={styles.chapterNavigation}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={!previousChapter}
+          onPress={() => previousChapter && onSelectChapter(previousChapter)}
+          style={[styles.chapterNavigationButton, !previousChapter && styles.chapterNavigationButtonDisabled]}
+        >
+          <ArrowLeft color={previousChapter ? '#12365c' : '#94a3b8'} size={18} strokeWidth={2.2} />
+          <View style={styles.chapterNavigationTextBlock}>
+            <Text style={[styles.chapterNavigationLabel, !previousChapter && styles.chapterNavigationTextDisabled]}>
+              Anterior
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.chapterNavigationTitle, !previousChapter && styles.chapterNavigationTextDisabled]}
+            >
+              {previousChapter ? `Capitulo ${previousChapter.number}` : 'Inicio del libro'}
+            </Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={!nextChapter}
+          onPress={() => nextChapter && onSelectChapter(nextChapter)}
+          style={[styles.chapterNavigationButton, styles.chapterNavigationButtonNext, !nextChapter && styles.chapterNavigationButtonDisabled]}
+        >
+          <View style={styles.chapterNavigationTextBlock}>
+            <Text style={[styles.chapterNavigationLabel, !nextChapter && styles.chapterNavigationTextDisabled]}>
+              Siguiente
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.chapterNavigationTitle, !nextChapter && styles.chapterNavigationTextDisabled]}
+            >
+              {nextChapter ? `Capitulo ${nextChapter.number}` : 'Fin del libro'}
+            </Text>
+          </View>
+          <ChevronRight color={nextChapter ? '#12365c' : '#94a3b8'} size={18} strokeWidth={2.2} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -757,6 +826,50 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     lineHeight: 24,
+  },
+  chapterNavigation: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  chapterNavigationButton: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#c3cfdd',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    minHeight: 58,
+    minWidth: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  chapterNavigationButtonNext: {
+    justifyContent: 'flex-end',
+  },
+  chapterNavigationButtonDisabled: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
+  },
+  chapterNavigationTextBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  chapterNavigationLabel: {
+    color: '#1b6fd7',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  chapterNavigationTitle: {
+    color: '#151922',
+    fontSize: 14,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  chapterNavigationTextDisabled: {
+    color: '#94a3b8',
   },
   muted: {
     color: '#606b7a',

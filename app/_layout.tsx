@@ -675,8 +675,18 @@ function BottomNavigation({
 
       {openMenu === 'meetings' ? (
         <View style={[styles.dropdownMenu, { bottom: bottomNavHeight }]}>
-          <BottomMenuItem icon={CalendarDays} label="Mis reuniones" onPress={() => navigateFromBottomMenu('/reuniones', 2)} />
-          <BottomMenuItem icon={MessageCircle} label="Chat" onPress={() => navigateFromBottomMenu('/chat', 2)} />
+          <BottomMenuItem
+            badgeCount={unreadMeetingNotificationCount}
+            icon={CalendarDays}
+            label="Mis reuniones"
+            onPress={() => navigateFromBottomMenu('/reuniones', 2)}
+          />
+          <BottomMenuItem
+            badgeCount={unreadChatCount}
+            icon={MessageCircle}
+            label="Chat"
+            onPress={() => navigateFromBottomMenu('/chat', 2)}
+          />
         </View>
       ) : null}
 
@@ -878,11 +888,13 @@ function DropdownItem({
 }
 
 function BottomMenuItem({
+  badgeCount = 0,
   icon: Icon,
   label,
   onPress,
   style,
 }: {
+  badgeCount?: number;
   icon: typeof Home;
   label: string;
   onPress: () => void;
@@ -898,6 +910,11 @@ function BottomMenuItem({
         <Icon color="#ffffff" size={21} strokeWidth={2.25} />
       </View>
       <Text style={styles.bottomMenuText}>{label}</Text>
+      {badgeCount > 0 ? (
+        <View style={styles.bottomMenuBadge}>
+          <Text style={styles.bottomMenuBadgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -1207,6 +1224,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingHorizontal: 10,
     paddingVertical: 9,
+    position: 'relative',
   },
   bottomMenuItemPressed: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -1247,6 +1265,24 @@ const styles = StyleSheet.create({
     color: '#2f3947',
     fontSize: 14,
     fontWeight: '800',
+  },
+  bottomMenuBadge: {
+    alignItems: 'center',
+    backgroundColor: '#dc2626',
+    borderColor: '#ffffff',
+    borderRadius: 9,
+    borderWidth: 1,
+    minWidth: 18,
+    paddingHorizontal: 5,
+    position: 'absolute',
+    right: 8,
+    top: 6,
+  },
+  bottomMenuBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '900',
+    lineHeight: 14,
   },
   dropdownTextDanger: {
     color: '#b42318',
