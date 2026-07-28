@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { CheckCircle2 } from 'lucide-react-native';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getApiErrorMessage } from '../../src/api/client';
 import { getDashboard, markDashboardAnnouncementRead } from '../../src/api/dashboard';
@@ -19,6 +20,7 @@ function formatDate(value?: string | null) {
 export default function AnnouncementDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const autoMarkedAnnouncementId = useRef<number | null>(null);
   const dashboardQuery = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboard,
@@ -29,6 +31,16 @@ export default function AnnouncementDetailScreen() {
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
+  const announcement = dashboardQuery.data?.announcements.data.find((item) => String(item.id) === String(id));
+
+  useEffect(() => {
+    if (!announcement || announcement.is_read || autoMarkedAnnouncementId.current === announcement.id) {
+      return;
+    }
+
+    autoMarkedAnnouncementId.current = announcement.id;
+    markReadMutation.mutate(announcement.id);
+  }, [announcement, markReadMutation]);
 
   if (dashboardQuery.isLoading) {
     return (
@@ -50,8 +62,6 @@ export default function AnnouncementDetailScreen() {
       </View>
     );
   }
-
-  const announcement = dashboardQuery.data?.announcements.data.find((item) => String(item.id) === String(id));
 
   if (!announcement) {
     return (

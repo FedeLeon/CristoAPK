@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MDS",
-    "slug": "mds",
+    "slug": "mensajedesalvacion",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -42,6 +42,17 @@
         }
       ],
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "expo-status-bar": {
+        "style": "dark",
+        "hidden": false
+      },
+      "eas": {
+        "projectId": "599b0468-07d4-4eef-b223-7be1e8b09e40"
+      }
+    },
+    "owner": "fededev1990s-team"
   }
 }

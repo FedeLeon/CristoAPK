@@ -152,6 +152,7 @@ export const notificationSchema = z.object({
   id: z.string(),
   type: z.string(),
   message: z.string(),
+  role: z.string().nullable().optional(),
   url: z.string().nullable().optional(),
   read_at: z.string().nullable().optional(),
   created_at: z.string().nullable().optional(),
@@ -197,6 +198,18 @@ export const dashboardTutorMetricSchema = z.object({
   value: z.number(),
 });
 
+export const dashboardAdminMetricSchema = z.object({
+  detail: z.string().nullable().optional(),
+  key: z.string(),
+  label: z.string(),
+  value: z.number(),
+});
+
+export const dashboardAdminAnnouncementSchema = dashboardAnnouncementSchema.extend({
+  status: z.string(),
+  status_label: z.string(),
+});
+
 export const dashboardResponseSchema = z.object({
   daily_verse: dashboardDailyVerseSchema.nullable().optional(),
   announcements: z.object({
@@ -204,6 +217,8 @@ export const dashboardResponseSchema = z.object({
     data: z.array(dashboardAnnouncementSchema),
   }),
   tutor_metrics: z.array(dashboardTutorMetricSchema).nullable().optional(),
+  admin_metrics: z.array(dashboardAdminMetricSchema).nullable().optional(),
+  admin_announcements: z.array(dashboardAdminAnnouncementSchema).nullable().optional(),
 });
 
 export const pastoralGuidanceVerseSchema = z.object({
@@ -327,6 +342,44 @@ export const tutorUsersResponseSchema = z.object({
   groups: z.array(tutorGroupSchema),
 });
 
+export const adminIndividualRoleSchema = z.enum(['student', 'tutor', 'pastor']);
+export const adminIndividualStatusSchema = z.enum(['activo', 'bloqueado']);
+
+export const adminIndividualSummarySchema = z.object({
+  id: z.number(),
+  name: z.string(),
+});
+
+export const adminIndividualSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  last_name: z.string().nullable().optional(),
+  full_name: z.string(),
+  email: z.string(),
+  role: adminIndividualRoleSchema,
+  role_label: z.string(),
+  status: adminIndividualStatusSchema,
+  status_label: z.string(),
+  avatar_url: z.string().nullable().optional(),
+  avatar_initials: z.string().nullable().optional(),
+  avatar_color: z.string().nullable().optional(),
+  created_by: z.string().nullable().optional(),
+  registration_source_label: z.string().nullable().optional(),
+  tutor: adminIndividualSummarySchema.nullable().optional(),
+  students_count: z.number().optional(),
+});
+
+export const adminIndividualsResponseSchema = z.object({
+  data: z.array(adminIndividualSchema),
+  tabs: z.array(
+    z.object({
+      key: z.string(),
+      label: z.string(),
+    }),
+  ),
+  tutors: z.array(adminIndividualSummarySchema),
+});
+
 export type ApiUser = z.infer<typeof userSchema>;
 export type Course = z.infer<typeof courseSchema>;
 export type CourseModule = z.infer<typeof courseModuleSchema>;
@@ -340,6 +393,8 @@ export type ChatConversation = z.infer<typeof chatConversationSchema>;
 export type Meeting = z.infer<typeof meetingSchema>;
 export type AppNotification = z.infer<typeof notificationSchema>;
 export type DashboardAnnouncement = z.infer<typeof dashboardAnnouncementSchema>;
+export type DashboardAdminAnnouncement = z.infer<typeof dashboardAdminAnnouncementSchema>;
+export type DashboardAdminMetric = z.infer<typeof dashboardAdminMetricSchema>;
 export type DashboardDailyVerse = z.infer<typeof dashboardDailyVerseSchema>;
 export type DashboardTutorMetric = z.infer<typeof dashboardTutorMetricSchema>;
 export type PastoralGuidanceResponse = z.infer<typeof pastoralGuidanceResponseSchema>;
@@ -348,6 +403,10 @@ export type TutorGroup = z.infer<typeof tutorGroupSchema>;
 export type TutorPastoralAnalysisResponse = z.infer<typeof tutorPastoralAnalysisResponseSchema>;
 export type TutorStudent = z.infer<typeof tutorStudentSchema>;
 export type TutorUsersResponse = z.infer<typeof tutorUsersResponseSchema>;
+export type AdminIndividual = z.infer<typeof adminIndividualSchema>;
+export type AdminIndividualRole = z.infer<typeof adminIndividualRoleSchema>;
+export type AdminIndividualStatus = z.infer<typeof adminIndividualStatusSchema>;
+export type AdminIndividualsResponse = z.infer<typeof adminIndividualsResponseSchema>;
 
 export function extractApiData<T>(payload: T | { data: T }): T {
   if (payload && typeof payload === 'object' && 'data' in payload) {

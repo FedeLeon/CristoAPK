@@ -14,15 +14,16 @@ import {
   UserCog,
   UsersRound,
 } from 'lucide-react-native';
-import { Link, router, Stack, usePathname } from 'expo-router';
+import { router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { BackHandler, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Image, Modal, Platform, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logout, me } from '../src/api/auth';
 import { getNotifications, markNotificationsRead } from '../src/api/notifications';
 import { getAuthToken } from '../src/auth/tokenStorage';
 import { AppBackground } from '../src/components/AppBackground';
+import { NotificationListItem } from '../src/components/NotificationListItem';
 import { ScreenTitle, ScreenTitleIcon } from '../src/components/ScreenTitle';
 
 export default function RootLayout() {
@@ -44,27 +45,29 @@ export default function RootLayout() {
         <View style={styles.shell}>
           <AppBackground />
           <LogicalAndroidBackHandler />
-          <StatusBar hidden={false} style="dark" />
+          <StatusBar hidden={false} style="light" />
           <View style={styles.stackArea}>
             <Stack
               screenOptions={{
                 headerLeft: () => <HeaderBackButton />,
                 headerRight: () => <HeaderActions />,
                 headerTitle: () => <AppHeaderTitle />,
-                headerStyle: { backgroundColor: '#ffffff' },
+                headerStyle: { backgroundColor: '#12365c' },
                 headerShadowVisible: false,
                 contentStyle: { backgroundColor: 'transparent' },
               }}
             >
-              <Stack.Screen name="index" options={{ headerBackVisible: false, title: 'MDS' }} />
+              <Stack.Screen name="index" options={{ headerBackVisible: false, headerTitleAlign: 'left', title: 'MDS' }} />
               <Stack.Screen name="login" options={{ headerShown: false, title: 'Ingresar' }} />
               <Stack.Screen name="registro" options={{ headerShown: false, title: 'Registrarme' }} />
               <Stack.Screen name="olvide-mi-contrasena" options={{ headerShown: false, title: 'Recuperar contrasena' }} />
               <Stack.Screen name="perfil" options={{ title: 'Mi perfil' }} />
               <Stack.Screen name="orientacion-pastoral" options={{ title: 'Orientacion pastoral' }} />
               <Stack.Screen name="usuarios" options={{ title: 'Usuarios' }} />
+              <Stack.Screen name="individuos" options={{ title: 'Individuos' }} />
               <Stack.Screen name="anuncios/index" options={{ title: 'Anuncios' }} />
               <Stack.Screen name="anuncios/[id]" options={{ title: 'Anuncio' }} />
+              <Stack.Screen name="notificaciones/index" options={{ title: 'Notificaciones' }} />
               <Stack.Screen name="cursos/index" options={{ title: 'Contenido' }} />
               <Stack.Screen name="cursos/[id]" options={{ title: 'Contenido' }} />
               <Stack.Screen name="cursos/[id]/lecciones/[lessonId]" options={{ title: 'Leccion' }} />
@@ -99,8 +102,16 @@ function getHeaderTitle(pathname: string): { icon: ScreenTitleIcon; text: string
     return { icon: 'users', text: 'Usuarios' };
   }
 
+  if (pathname.startsWith('/individuos')) {
+    return { icon: 'users', text: 'Individuos' };
+  }
+
   if (pathname.startsWith('/anuncios')) {
     return { icon: 'announcements', text: pathname === '/anuncios' ? 'Anuncios' : 'Anuncio' };
+  }
+
+  if (pathname.startsWith('/notificaciones')) {
+    return { icon: 'notifications', text: 'Notificaciones' };
   }
 
   if (pathname.startsWith('/cursos/') && pathname.includes('/lecciones/')) {
@@ -137,12 +148,12 @@ function AppHeaderTitle() {
   if (pathname === '/') {
     return (
       <View style={styles.headerBrandTitle}>
-        <Image source={require('../assets/brand/mds-dove-black.png')} style={styles.headerBrandLogo} />
+        <Image source={require('../assets/brand/mds-dove-white.png')} style={styles.headerBrandLogo} />
       </View>
     );
   }
 
-  return <ScreenTitle icon={title.icon} size="small" text={title.text} />;
+  return <ScreenTitle icon={title.icon} size="small" text={title.text} tone="inverted" />;
 }
 
 function getParentRoute(pathname: string) {
@@ -158,7 +169,9 @@ function getParentRoute(pathname: string) {
     pathname === '/perfil' ||
     pathname === '/orientacion-pastoral' ||
     pathname === '/usuarios' ||
+    pathname === '/individuos' ||
     pathname === '/anuncios' ||
+    pathname === '/notificaciones' ||
     pathname === '/cursos' ||
     pathname === '/biblia'
   ) {
@@ -171,6 +184,10 @@ function getParentRoute(pathname: string) {
 
   if (pathname.startsWith('/anuncios/')) {
     return '/anuncios';
+  }
+
+  if (pathname.startsWith('/notificaciones/')) {
+    return '/notificaciones';
   }
 
   if (pathname.startsWith('/reuniones/')) {
@@ -232,7 +249,7 @@ function HeaderBackButton() {
       onPress={() => router.replace(parentRoute)}
       style={styles.headerBackButton}
     >
-      <ArrowLeft color="#1f2937" size={22} strokeWidth={2.3} />
+      <ArrowLeft color="#ffffff" size={22} strokeWidth={2.3} />
     </Pressable>
   );
 }
@@ -240,6 +257,7 @@ function HeaderBackButton() {
 function HeaderActions() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [openMenu, setOpenMenu] = useState<'notifications' | 'profile' | null>(null);
 
   const tokenQuery = useQuery({
@@ -289,7 +307,7 @@ function HeaderActions() {
   if (!isLoggedIn) {
     return (
       <Pressable accessibilityRole="button" onPress={() => router.push('/login')} style={styles.headerLoginButton}>
-        <LogIn color="#1b6fd7" size={19} strokeWidth={2.2} />
+        <LogIn color="#ffffff" size={19} strokeWidth={2.2} />
         <Text style={styles.headerLoginText}>Ingresar</Text>
       </Pressable>
     );
@@ -297,56 +315,82 @@ function HeaderActions() {
 
   return (
     <View style={styles.headerActions}>
-      {openMenu === 'notifications' ? (
-        <View style={styles.headerDropdown}>
-          <View style={styles.headerDropdownTitleRow}>
-            <Text style={styles.headerDropdownTitle}>Notificaciones</Text>
-            {unreadCount > 0 ? (
-              <Pressable
-                accessibilityRole="button"
-                disabled={markReadMutation.isPending}
-                onPress={() => markReadMutation.mutate()}
-              >
-                <Text style={styles.markReadText}>Marcar leidas</Text>
-              </Pressable>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setOpenMenu(null)}
+        transparent
+        visible={openMenu !== null}
+      >
+        <View style={styles.headerOverlay}>
+          <Pressable accessibilityRole="button" onPress={() => setOpenMenu(null)} style={styles.headerBackdrop} />
+          <View style={[styles.headerDropdown, { top: Math.max(insets.top, 12) + 52 }]}>
+            {openMenu === 'notifications' ? (
+              <>
+                <View style={styles.headerDropdownTitleRow}>
+                  <Text style={styles.headerDropdownTitle}>Notificaciones</Text>
+                  {unreadCount > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={markReadMutation.isPending}
+                      onPress={() => markReadMutation.mutate()}
+                    >
+                      <Text style={styles.markReadText}>Marcar leidas</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+
+                {notificationsQuery.isLoading ? (
+                  <Text style={styles.dropdownMuted}>Cargando...</Text>
+                ) : notificationsQuery.data?.data.length ? (
+                  notificationsQuery.data.data.slice(0, 5).map((notification) => (
+                    <NotificationListItem compact key={notification.id} notification={notification} />
+                  ))
+                ) : (
+                  <Text style={styles.dropdownMuted}>No tenes notificaciones.</Text>
+                )}
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setOpenMenu(null);
+                    router.push('/notificaciones');
+                  }}
+                  style={styles.viewAllNotificationsButton}
+                >
+                  <Text style={styles.viewAllNotificationsText}>Ver todas</Text>
+                </Pressable>
+              </>
+            ) : null}
+
+            {openMenu === 'profile' ? (
+              <>
+                <DropdownItem
+                  icon={CircleUserRound}
+                  label="Mi perfil"
+                  onPress={() => {
+                    setOpenMenu(null);
+                    router.push('/perfil');
+                  }}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={logoutMutation.isPending}
+                  onPress={() => logoutMutation.mutate()}
+                  style={StyleSheet.flatten([
+                    styles.dropdownItem,
+                    styles.dropdownItemDanger,
+                    logoutMutation.isPending && styles.dropdownItemDisabled,
+                  ])}
+                >
+                  <LogOut color="#b42318" size={20} strokeWidth={2.2} />
+                  <Text style={styles.dropdownTextDanger}>
+                    {logoutMutation.isPending ? 'Cerrando...' : 'Cerrar sesion'}
+                  </Text>
+                </Pressable>
+              </>
             ) : null}
           </View>
-
-          {notificationsQuery.isLoading ? (
-            <Text style={styles.dropdownMuted}>Cargando...</Text>
-          ) : notificationsQuery.data?.data.length ? (
-            notificationsQuery.data.data.slice(0, 5).map((notification) => (
-              <View key={notification.id} style={styles.notificationItem}>
-                <Text style={styles.notificationText}>{notification.message}</Text>
-                <Text style={styles.notificationDate}>{formatShortDate(notification.created_at)}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.dropdownMuted}>No tenes notificaciones.</Text>
-          )}
         </View>
-      ) : null}
-
-      {openMenu === 'profile' ? (
-        <View style={styles.headerDropdown}>
-          <DropdownItem icon={CircleUserRound} label="Mi perfil" onPress={() => router.push('/perfil')} />
-          <Pressable
-            accessibilityRole="button"
-            disabled={logoutMutation.isPending}
-            onPress={() => logoutMutation.mutate()}
-            style={StyleSheet.flatten([
-              styles.dropdownItem,
-              styles.dropdownItemDanger,
-              logoutMutation.isPending && styles.dropdownItemDisabled,
-            ])}
-          >
-            <LogOut color="#b42318" size={20} strokeWidth={2.2} />
-            <Text style={styles.dropdownTextDanger}>
-              {logoutMutation.isPending ? 'Cerrando...' : 'Cerrar sesion'}
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
+      </Modal>
 
       <Pressable
         accessibilityRole="button"
@@ -354,7 +398,7 @@ function HeaderActions() {
         onPress={() => setOpenMenu((current) => (current === 'notifications' ? null : 'notifications'))}
         style={styles.headerIconButton}
       >
-        <Bell color="#64748b" size={21} strokeWidth={2.2} />
+        <Bell color="#f8fafc" size={21} strokeWidth={2.2} />
         {unreadCount > 0 ? (
           <View style={styles.notificationBadge}>
             <Text style={styles.notificationBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -381,7 +425,7 @@ function HeaderActions() {
 function BottomNavigation() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const [openMenu, setOpenMenu] = useState<'content' | 'meetings' | 'users' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'content' | 'individuals' | 'meetings' | 'users' | null>(null);
 
   const tokenQuery = useQuery({
     queryKey: ['auth-token'],
@@ -397,40 +441,43 @@ function BottomNavigation() {
   const isLoggedIn = Boolean(tokenQuery.data && meQuery.data);
   const isStudent = meQuery.data?.role === 'student';
   const isTutor = meQuery.data?.role === 'tutor';
+  const isAdmin = meQuery.data?.role === 'admin' || meQuery.data?.role === 'superadmin';
   const isContentActive = pathname.startsWith('/cursos') || pathname.startsWith('/biblia');
   const isMeetingsActive = pathname.startsWith('/reuniones') || pathname.startsWith('/chat');
   const isPastoralActive = pathname.startsWith('/orientacion-pastoral');
   const isUsersActive = pathname.startsWith('/usuarios');
+  const isIndividualsActive = pathname.startsWith('/individuos');
 
   useEffect(() => {
     setOpenMenu(null);
   }, [pathname]);
 
-  const menuBottom = Math.max(insets.bottom, 8) + 72;
+  const bottomSafeArea = Math.max(insets.bottom, 8);
+  const bottomNavHeight = bottomSafeArea + 60;
 
   if (!isLoggedIn) {
     return null;
   }
 
   return (
-    <View>
+    <View style={styles.bottomNavigationShell}>
       {openMenu === 'content' ? (
-        <View style={[styles.dropdownMenu, styles.dropdownMenuLeft, { bottom: menuBottom }]}>
-          <DropdownItem icon={GraduationCap} label="Contenido general" onPress={() => router.push('/cursos')} />
-          <DropdownItem icon={BookOpen} label="Biblia" onPress={() => router.push('/biblia')} />
+        <View style={[styles.dropdownMenu, { bottom: bottomNavHeight }]}>
+          <BottomMenuItem icon={GraduationCap} label="Contenido general" onPress={() => router.push('/cursos')} />
+          <BottomMenuItem icon={BookOpen} label="Biblia" onPress={() => router.push('/biblia')} />
         </View>
       ) : null}
 
       {openMenu === 'meetings' ? (
-        <View style={[styles.dropdownMenu, styles.dropdownMenuRight, { bottom: menuBottom }]}>
-          <DropdownItem icon={CalendarDays} label="Mis reuniones" onPress={() => router.push('/reuniones')} />
-          <DropdownItem icon={MessageCircle} label="Chat" onPress={() => router.push('/chat')} />
+        <View style={[styles.dropdownMenu, { bottom: bottomNavHeight }]}>
+          <BottomMenuItem icon={CalendarDays} label="Mis reuniones" onPress={() => router.push('/reuniones')} />
+          <BottomMenuItem icon={MessageCircle} label="Chat" onPress={() => router.push('/chat')} />
         </View>
       ) : null}
 
       {openMenu === 'users' ? (
-        <View style={[styles.dropdownMenu, styles.dropdownMenuRight, { bottom: menuBottom }]}>
-          <DropdownItem
+        <View style={[styles.dropdownMenu, { bottom: bottomNavHeight }]}>
+          <BottomMenuItem
             icon={UserCog}
             label="Listado de usuarios"
             onPress={() => {
@@ -438,7 +485,7 @@ function BottomNavigation() {
               router.push({ pathname: '/usuarios', params: { tab: 'students' } });
             }}
           />
-          <DropdownItem
+          <BottomMenuItem
             icon={UsersRound}
             label="Grupos"
             onPress={() => {
@@ -449,49 +496,122 @@ function BottomNavigation() {
         </View>
       ) : null}
 
-      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-        <Link href="/" asChild>
-          <Pressable
-            accessibilityRole="link"
-            accessibilityState={{ selected: pathname === '/' }}
-            style={StyleSheet.flatten([styles.bottomNavItem, pathname === '/' && styles.bottomNavItemActive])}
-          >
-            <Home color={pathname === '/' ? '#1b6fd7' : '#64748b'} size={22} strokeWidth={2.2} />
-            <Text style={[styles.bottomNavText, pathname === '/' && styles.bottomNavTextActive]}>Inicio</Text>
-          </Pressable>
-        </Link>
+      {openMenu === 'individuals' ? (
+        <View style={[styles.dropdownMenu, styles.dropdownMenuGrid, { bottom: bottomNavHeight }]}>
+          <BottomMenuItem
+            icon={UsersRound}
+            label="Todos"
+            onPress={() => {
+              setOpenMenu(null);
+              router.push({ pathname: '/individuos', params: { tab: 'all' } });
+            }}
+            style={styles.dropdownMenuGridItem}
+          />
+          <BottomMenuItem
+            icon={CircleUserRound}
+            label="Pastores"
+            onPress={() => {
+              setOpenMenu(null);
+              router.push({ pathname: '/individuos', params: { tab: 'pastors' } });
+            }}
+            style={styles.dropdownMenuGridItem}
+          />
+          <BottomMenuItem
+            icon={UserCog}
+            label="Tutores"
+            onPress={() => {
+              setOpenMenu(null);
+              router.push({ pathname: '/individuos', params: { tab: 'tutors' } });
+            }}
+            style={styles.dropdownMenuGridItem}
+          />
+          <BottomMenuItem
+            icon={UsersRound}
+            label="Usuarios"
+            onPress={() => {
+              setOpenMenu(null);
+              router.push({ pathname: '/individuos', params: { tab: 'students' } });
+            }}
+            style={styles.dropdownMenuGridItem}
+          />
+        </View>
+      ) : null}
+
+      <View style={[styles.bottomNav, { paddingBottom: bottomSafeArea }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: pathname === '/' }}
+          onPress={() => router.replace('/')}
+          style={({ pressed }) =>
+            StyleSheet.flatten([styles.bottomNavItem, pathname === '/' && styles.bottomNavItemActive, pressed && styles.bottomNavItemPressed])
+          }
+        >
+          <Home color={pathname === '/' ? '#ffffff' : '#d7e6f3'} size={22} strokeWidth={2.2} />
+          <Text adjustsFontSizeToFit minimumFontScale={0.78} numberOfLines={1} style={[styles.bottomNavText, pathname === '/' && styles.bottomNavTextActive]}>
+            Inicio
+          </Text>
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ expanded: openMenu === 'content', selected: isContentActive }}
           onPress={() => setOpenMenu((current) => (current === 'content' ? null : 'content'))}
-          style={StyleSheet.flatten([styles.bottomNavItem, isContentActive && styles.bottomNavItemActive])}
+          style={({ pressed }) =>
+            StyleSheet.flatten([
+              styles.bottomNavItem,
+              (isContentActive || openMenu === 'content') && styles.bottomNavItemActive,
+              pressed && styles.bottomNavItemPressed,
+            ])
+          }
         >
-          <GraduationCap color={isContentActive ? '#1b6fd7' : '#64748b'} size={22} strokeWidth={2.2} />
-          <Text style={[styles.bottomNavText, isContentActive && styles.bottomNavTextActive]}>Contenido</Text>
+          <GraduationCap color={isContentActive || openMenu === 'content' ? '#ffffff' : '#d7e6f3'} size={22} strokeWidth={2.2} />
+          <Text
+            adjustsFontSizeToFit
+            minimumFontScale={0.78}
+            numberOfLines={1}
+            style={[styles.bottomNavText, (isContentActive || openMenu === 'content') && styles.bottomNavTextActive]}
+          >
+            Contenido
+          </Text>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ expanded: openMenu === 'meetings', selected: isMeetingsActive }}
           onPress={() => setOpenMenu((current) => (current === 'meetings' ? null : 'meetings'))}
-          style={StyleSheet.flatten([styles.bottomNavItem, isMeetingsActive && styles.bottomNavItemActive])}
+          style={({ pressed }) =>
+            StyleSheet.flatten([
+              styles.bottomNavItem,
+              (isMeetingsActive || openMenu === 'meetings') && styles.bottomNavItemActive,
+              pressed && styles.bottomNavItemPressed,
+            ])
+          }
         >
-          <CalendarDays color={isMeetingsActive ? '#1b6fd7' : '#64748b'} size={22} strokeWidth={2.2} />
-          <Text style={[styles.bottomNavText, isMeetingsActive && styles.bottomNavTextActive]}>Reuniones</Text>
+          <CalendarDays color={isMeetingsActive || openMenu === 'meetings' ? '#ffffff' : '#d7e6f3'} size={22} strokeWidth={2.2} />
+          <Text
+            adjustsFontSizeToFit
+            minimumFontScale={0.78}
+            numberOfLines={1}
+            style={[styles.bottomNavText, (isMeetingsActive || openMenu === 'meetings') && styles.bottomNavTextActive]}
+          >
+            Reuniones
+          </Text>
         </Pressable>
 
         {isStudent ? (
-          <Link href="/orientacion-pastoral" asChild>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityState={{ selected: isPastoralActive }}
-              style={StyleSheet.flatten([styles.bottomNavItem, isPastoralActive && styles.bottomNavItemActive])}
-            >
-              <HeartHandshake color={isPastoralActive ? '#1b6fd7' : '#64748b'} size={22} strokeWidth={2.2} />
-              <Text style={[styles.bottomNavText, isPastoralActive && styles.bottomNavTextActive]}>Orientacion</Text>
-            </Pressable>
-          </Link>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: isPastoralActive }}
+            onPress={() => router.push('/orientacion-pastoral')}
+            style={({ pressed }) =>
+              StyleSheet.flatten([styles.bottomNavItem, isPastoralActive && styles.bottomNavItemActive, pressed && styles.bottomNavItemPressed])
+            }
+          >
+            <HeartHandshake color={isPastoralActive ? '#ffffff' : '#d7e6f3'} size={22} strokeWidth={2.2} />
+            <Text adjustsFontSizeToFit minimumFontScale={0.78} numberOfLines={1} style={[styles.bottomNavText, isPastoralActive && styles.bottomNavTextActive]}>
+              Orientacion
+            </Text>
+          </Pressable>
         ) : null}
 
         {isTutor ? (
@@ -499,10 +619,48 @@ function BottomNavigation() {
             accessibilityRole="button"
             accessibilityState={{ expanded: openMenu === 'users', selected: isUsersActive }}
             onPress={() => setOpenMenu((current) => (current === 'users' ? null : 'users'))}
-            style={StyleSheet.flatten([styles.bottomNavItem, isUsersActive && styles.bottomNavItemActive])}
+            style={({ pressed }) =>
+              StyleSheet.flatten([
+                styles.bottomNavItem,
+                (isUsersActive || openMenu === 'users') && styles.bottomNavItemActive,
+                pressed && styles.bottomNavItemPressed,
+              ])
+            }
           >
-            <UsersRound color={isUsersActive ? '#1b6fd7' : '#64748b'} size={22} strokeWidth={2.2} />
-            <Text style={[styles.bottomNavText, isUsersActive && styles.bottomNavTextActive]}>Usuarios</Text>
+            <UsersRound color={isUsersActive || openMenu === 'users' ? '#ffffff' : '#d7e6f3'} size={22} strokeWidth={2.2} />
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+              numberOfLines={1}
+              style={[styles.bottomNavText, (isUsersActive || openMenu === 'users') && styles.bottomNavTextActive]}
+            >
+              Usuarios
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {isAdmin ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: openMenu === 'individuals', selected: isIndividualsActive }}
+            onPress={() => setOpenMenu((current) => (current === 'individuals' ? null : 'individuals'))}
+            style={({ pressed }) =>
+              StyleSheet.flatten([
+                styles.bottomNavItem,
+                (isIndividualsActive || openMenu === 'individuals') && styles.bottomNavItemActive,
+                pressed && styles.bottomNavItemPressed,
+              ])
+            }
+          >
+            <UsersRound color={isIndividualsActive || openMenu === 'individuals' ? '#ffffff' : '#d7e6f3'} size={22} strokeWidth={2.2} />
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={0.72}
+              numberOfLines={1}
+              style={[styles.bottomNavText, (isIndividualsActive || openMenu === 'individuals') && styles.bottomNavTextActive]}
+            >
+              Individuos
+            </Text>
           </Pressable>
         ) : null}
       </View>
@@ -527,17 +685,29 @@ function DropdownItem({
   );
 }
 
-function formatShortDate(value?: string | null) {
-  if (!value) {
-    return '';
-  }
-
-  return new Intl.DateTimeFormat('es-AR', {
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    month: '2-digit',
-  }).format(new Date(value));
+function BottomMenuItem({
+  icon: Icon,
+  label,
+  onPress,
+  style,
+}: {
+  icon: typeof Home;
+  label: string;
+  onPress: () => void;
+  style?: ViewStyle;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => StyleSheet.flatten([styles.bottomMenuItem, style, pressed && styles.bottomMenuItemPressed])}
+    >
+      <View style={styles.bottomMenuIcon}>
+        <Icon color="#ffffff" size={21} strokeWidth={2.25} />
+      </View>
+      <Text style={styles.bottomMenuText}>{label}</Text>
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -571,7 +741,7 @@ const styles = StyleSheet.create({
     width: 36,
   },
   headerBrandTitle: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
   },
   headerBrandLogo: {
@@ -587,13 +757,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   headerLoginText: {
-    color: '#1b6fd7',
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '800',
   },
   avatarButton: {
     alignItems: 'center',
     backgroundColor: '#1b6fd7',
+    borderColor: 'rgba(255, 255, 255, 0.72)',
+    borderWidth: 1,
     borderRadius: 18,
     height: 36,
     justifyContent: 'center',
@@ -626,15 +798,26 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '900',
   },
+  headerOverlay: {
+    flex: 1,
+  },
+  headerBackdrop: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
   headerDropdown: {
     backgroundColor: '#ffffff',
     borderColor: '#dce2ea',
     borderRadius: 8,
     borderWidth: 1,
+    elevation: 12,
     gap: 6,
     padding: 8,
     position: 'absolute',
-    right: 0,
+    right: 12,
     top: 44,
     width: 280,
     zIndex: 20,
@@ -654,78 +837,135 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  notificationItem: {
-    backgroundColor: '#f8fafc',
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-    padding: 10,
-  },
-  notificationText: {
-    color: '#2f3947',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  notificationDate: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '700',
-  },
   dropdownMuted: {
     color: '#64748b',
     fontSize: 13,
     lineHeight: 18,
     padding: 8,
   },
+  viewAllNotificationsButton: {
+    alignItems: 'center',
+    backgroundColor: '#12365c',
+    borderRadius: 8,
+    minHeight: 42,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  viewAllNotificationsText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  bottomNavigationShell: {
+    position: 'relative',
+    width: '100%',
+  },
   bottomNav: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderTopColor: '#dce2ea',
+    backgroundColor: '#12365c',
+    borderTopColor: '#0f2d4d',
     borderTopWidth: 1,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
+    overflow: 'hidden',
     paddingHorizontal: 8,
     paddingTop: 8,
+    width: '100%',
   },
   bottomNavItem: {
     alignItems: 'center',
     borderRadius: 8,
     flex: 1,
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
     gap: 3,
     justifyContent: 'center',
-    minHeight: 52,
-    paddingHorizontal: 6,
+    height: 52,
+    minWidth: 0,
+    paddingHorizontal: 4,
     paddingVertical: 6,
   },
   bottomNavItemActive: {
-    backgroundColor: '#e8f1ff',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  bottomNavItemPressed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    transform: [{ translateY: -1 }],
   },
   bottomNavText: {
-    color: '#64748b',
+    color: '#d7e6f3',
     fontSize: 12,
     fontWeight: '700',
+    textAlign: 'center',
+    width: '100%',
   },
   bottomNavTextActive: {
-    color: '#1b6fd7',
+    color: '#ffffff',
   },
   dropdownMenu: {
-    backgroundColor: '#ffffff',
-    borderColor: '#dce2ea',
+    backgroundColor: '#0f2d4d',
+    borderColor: '#0f2d4d',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    elevation: 14,
+    flexDirection: 'row',
+    gap: 10,
+    left: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    position: 'absolute',
+    right: 0,
+    width: '100%',
+    zIndex: 30,
+  },
+  dropdownMenuGrid: {
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  dropdownMenuGridItem: {
+    flexBasis: '48%',
+    flexGrow: 1,
+  },
+  bottomMenuItem: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 4,
-    padding: 6,
-    position: 'absolute',
-    width: 210,
-    zIndex: 10,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+    minHeight: 52,
+    minWidth: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
   },
-  dropdownMenuLeft: {
-    left: 72,
+  bottomMenuItemPressed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.42)',
   },
-  dropdownMenuRight: {
-    right: 12,
+  bottomMenuIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 8,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  bottomMenuText: {
+    color: '#f8fafc',
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 17,
+    textAlign: 'left',
   },
   dropdownItem: {
     alignItems: 'center',

@@ -46,20 +46,23 @@ const iconMap: Record<ScreenTitleIcon, LucideIcon> = {
 export function ScreenTitle({
   icon,
   size = 'large',
+  tone = 'default',
   text,
 }: {
   icon: ScreenTitleIcon;
   size?: 'large' | 'medium' | 'small';
+  tone?: 'default' | 'inverted';
   text: string;
 }) {
   const Icon = iconMap[icon];
+  const isInverted = tone === 'inverted';
 
   return (
     <View style={styles.row}>
-      <View style={size === 'small' ? styles.iconSmall : styles.icon}>
-        <Icon color="#1b6fd7" size={size === 'small' ? 17 : 21} strokeWidth={2.3} />
+      <View style={[size === 'small' ? styles.iconSmall : styles.icon, isInverted && styles.iconInverted]}>
+        <Icon color={isInverted ? '#ffffff' : '#1b6fd7'} size={size === 'small' ? 17 : 21} strokeWidth={2.3} />
       </View>
-      <Text style={[styles.text, styles[size]]}>{text}</Text>
+      <Text style={[styles.text, styles[size], isInverted && styles.textInverted]}>{text}</Text>
     </View>
   );
 }
@@ -91,6 +94,12 @@ const styles = StyleSheet.create({
     color: '#151922',
     flexShrink: 1,
     fontWeight: '900',
+  },
+  iconInverted: {
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  textInverted: {
+    color: '#ffffff',
   },
   large: {
     fontSize: 26,

@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import {
   BookOpen,
+  Camera,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -10,16 +12,35 @@ import {
   IdCard,
   Megaphone,
   MessageCircle,
+  Pencil,
+  Plus,
   Quote,
+  Trash2,
+  Unlock,
   UsersRound,
 } from 'lucide-react-native';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { me } from '../src/api/auth';
 import { getApiErrorMessage } from '../src/api/client';
-import { getDashboard, markDashboardAnnouncementRead } from '../src/api/dashboard';
+import {
+  createAdminAnnouncement,
+  deleteAdminAnnouncement,
+  getDashboard,
+  markDashboardAnnouncementRead,
+  updateAdminAnnouncement,
+  updateAdminAnnouncementStatus,
+  type AdminAnnouncementInput,
+} from '../src/api/dashboard';
 import { getAuthToken } from '../src/auth/tokenStorage';
 import { ScreenTitle } from '../src/components/ScreenTitle';
-import { ApiUser, DashboardAnnouncement, DashboardTutorMetric } from '../src/types/api';
+import {
+  ApiUser,
+  DashboardAdminAnnouncement,
+  DashboardAdminMetric,
+  DashboardAnnouncement,
+  DashboardTutorMetric,
+} from '../src/types/api';
 
 function getRoleDashboard(user?: ApiUser) {
   if (!user) {
@@ -30,7 +51,7 @@ function getRoleDashboard(user?: ApiUser) {
     };
   }
 
-  if (user.role === 'admin') {
+  if (user.role === 'admin' || user.role === 'superadmin') {
     return {
       label: 'Administrador',
       title: 'Dashboard Admin',
@@ -75,13 +96,14 @@ export default function HomeScreen() {
   });
 
   const isLoggedIn = Boolean(tokenQuery.data && meQuery.data);
+  const isAdmin = meQuery.data?.role === 'admin' || meQuery.data?.role === 'superadmin';
   const isStudent = meQuery.data?.role === 'student';
   const isTutor = meQuery.data?.role === 'tutor';
   const dashboard = getRoleDashboard(meQuery.data);
   const dashboardQuery = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboard,
-    enabled: Boolean(isLoggedIn && (isStudent || isTutor)),
+    enabled: Boolean(isLoggedIn && (isStudent || isTutor || isAdmin)),
   });
   const markAnnouncementReadMutation = useMutation({
     mutationFn: markDashboardAnnouncementRead,
@@ -141,6 +163,15 @@ export default function HomeScreen() {
 
       {isLoggedIn ? (
         <>
+          {isAdmin ? (
+            <AdminDashboardBlocks
+              data={dashboardQuery.data}
+              error={dashboardQuery.error}
+              isError={dashboardQuery.isError}
+              isLoading={dashboardQuery.isLoading}
+            />
+          ) : null}
+
           {isStudent || isTutor ? (
             <DashboardBlocks
               data={dashboardQuery.data}
@@ -172,6 +203,374 @@ export default function HomeScreen() {
         </Pressable>
       )}
     </ScrollView>
+  );
+}
+
+const emptyAnnouncementForm: AdminAnnouncementInput = {
+  body: '',
+  ends_at: '',
+  image: undefined,
+  starts_at: '',
+  status: 'activo',
+  title: '',
+};
+
+function filenameFromUri(uri: string) {
+  return uri.split('/').pop() || `announcement-${Date.now()}.jpg`;
+}
+
+function mimeFromUri(uri: string) {
+  const extension = filenameFromUri(uri).split('.').pop()?.toLowerCase();
+
+  if (extension === 'png') {
+    return 'image/png';
+  }
+
+  if (extension === 'webp') {
+    return 'image/webp';
+  }
+
+  return 'image/jpeg';
+}
+
+function AdminDashboardBlocks({
+  data,
+  error,
+  isError,
+  isLoading,
+}: {
+  data?: Awaited<ReturnType<typeof getDashboard>>;
+  error: unknown;
+  isError: boolean;
+  isLoading: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<DashboardAdminAnnouncement | null>(null);
+  const [form, setForm] = useState<AdminAnnouncementInput>(emptyAnnouncementForm);
+
+  const refreshDashboard = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: ({ id, input }: { id?: number; input: AdminAnnouncementInput }) =>
+      id ? updateAdminAnnouncement(id, input) : createAdminAnnouncement(input),
+    onSuccess: async () => {
+      setModalOpen(false);
+      setEditingAnnouncement(null);
+      setForm(emptyAnnouncementForm);
+      await refreshDashboard();
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: 'activo' | 'inactivo' }) => updateAdminAnnouncementStatus(id, status),
+    onSuccess: refreshDashboard,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteAdminAnnouncement,
+    onSuccess: refreshDashboard,
+  });
+
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert('Permiso requerido', 'Necesitamos permiso para elegir una imagen del dispositivo.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [16, 9],
+      mediaTypes: ['images'],
+      quality: 0.85,
+    });
+
+    if (result.canceled || !result.assets[0]?.uri) {
+      return;
+    }
+
+    const uri = result.assets[0].uri;
+    setForm((current) => ({
+      ...current,
+      image: {
+        name: filenameFromUri(uri),
+        type: mimeFromUri(uri),
+        uri,
+      },
+    }));
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.dashboardBlock}>
+        <ActivityIndicator />
+        <Text style={styles.sessionText}>Cargando panel admin...</Text>
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View style={styles.dashboardBlock}>
+        <ScreenTitle icon="home" size="medium" text="No se pudo cargar el dashboard" />
+        <Text style={styles.error}>{getApiErrorMessage(error)}</Text>
+      </View>
+    );
+  }
+
+  const announcements = data?.admin_announcements ?? [];
+
+  return (
+    <>
+      {data?.admin_metrics?.length ? <AdminMetricsBlock metrics={data.admin_metrics} /> : null}
+
+      <View style={styles.dashboardBlock}>
+        <View style={styles.blockHeader}>
+          <View style={styles.blockIcon}>
+            <Megaphone color="#1b6fd7" size={21} strokeWidth={2.2} />
+          </View>
+          <View style={styles.blockHeaderText}>
+            <Text style={styles.blockEyebrow}>Anuncios generales</Text>
+            <Text style={styles.blockTitle}>Crear y gestionar avisos de toda la app</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.iconActionButton}
+            onPress={() => {
+              setEditingAnnouncement(null);
+              setForm(emptyAnnouncementForm);
+              setModalOpen(true);
+            }}
+          >
+            <Plus color="#ffffff" size={19} strokeWidth={2.5} />
+          </Pressable>
+        </View>
+
+        {announcements.length ? (
+          <View style={styles.announcementList}>
+            {announcements.map((announcement) => (
+              <AdminAnnouncementCard
+                announcement={announcement}
+                busy={statusMutation.isPending || deleteMutation.isPending}
+                key={announcement.id}
+                onDelete={() => confirmDeleteAdminAnnouncement(announcement, deleteMutation.mutate)}
+                onEdit={() => {
+                  setEditingAnnouncement(announcement);
+                  setForm({
+                    body: announcement.body,
+                    ends_at: announcement.ends_at ?? '',
+                    image: undefined,
+                    starts_at: announcement.starts_at ?? '',
+                    status: announcement.status === 'inactivo' ? 'inactivo' : 'activo',
+                    title: announcement.title,
+                  });
+                  setModalOpen(true);
+                }}
+                onToggleStatus={() =>
+                  statusMutation.mutate({
+                    id: announcement.id,
+                    status: announcement.status === 'activo' ? 'inactivo' : 'activo',
+                  })
+                }
+              />
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.blockMeta}>No hay anuncios generales creados por este admin.</Text>
+        )}
+      </View>
+
+      <Modal animationType="slide" transparent visible={modalOpen} onRequestClose={() => setModalOpen(false)}>
+        <View style={styles.centeredModalBackdrop}>
+          <ScrollView contentContainerStyle={styles.centeredModalCard} style={styles.centeredModalScroll}>
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={styles.modalTitle}>{editingAnnouncement ? 'Editar anuncio' : 'Nuevo anuncio'}</Text>
+                <Text style={styles.blockMeta}>Aviso general visible para toda la app.</Text>
+              </View>
+              <Pressable accessibilityRole="button" onPress={() => setModalOpen(false)} style={styles.smallLinkButton}>
+                <Text style={styles.smallLinkButtonText}>Cerrar</Text>
+              </Pressable>
+            </View>
+
+            <DashboardField label="Titulo" value={form.title} onChangeText={(title) => setForm({ ...form, title })} />
+            <DashboardField
+              label="Mensaje"
+              multiline
+              value={form.body}
+              onChangeText={(body) => setForm({ ...form, body })}
+            />
+            <DashboardField
+              label="Visible desde"
+              value={form.starts_at ?? ''}
+              onChangeText={(starts_at) => setForm({ ...form, starts_at })}
+            />
+            <DashboardField
+              label="Visible hasta"
+              value={form.ends_at ?? ''}
+              onChangeText={(ends_at) => setForm({ ...form, ends_at })}
+            />
+            <View style={styles.imagePickerBlock}>
+              <Text style={styles.inputLabel}>Imagen</Text>
+              {form.image?.uri ? (
+                <Image source={{ uri: form.image.uri }} style={styles.modalImagePreview} />
+              ) : editingAnnouncement?.image_url ? (
+                <Image source={{ uri: editingAnnouncement.image_url }} style={styles.modalImagePreview} />
+              ) : null}
+              <Pressable accessibilityRole="button" style={styles.imagePickerButton} onPress={pickImage}>
+                <Camera color="#1b6fd7" size={17} strokeWidth={2.2} />
+                <Text style={styles.imagePickerButtonText}>{form.image ? 'Cambiar imagen' : 'Elegir imagen'}</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.inputLabel}>Estado</Text>
+            <View style={styles.choiceWrap}>
+              <DashboardChoice label="Activo" selected={form.status !== 'inactivo'} onPress={() => setForm({ ...form, status: 'activo' })} />
+              <DashboardChoice label="Inactivo" selected={form.status === 'inactivo'} onPress={() => setForm({ ...form, status: 'inactivo' })} />
+            </View>
+
+            {saveMutation.isError ? <Text style={styles.error}>{getApiErrorMessage(saveMutation.error)}</Text> : null}
+            <View style={styles.modalActions}>
+              <Pressable disabled={saveMutation.isPending} style={styles.cancelButton} onPress={() => setModalOpen(false)}>
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                disabled={saveMutation.isPending}
+                style={StyleSheet.flatten([styles.primaryModalButton, saveMutation.isPending && styles.disabled])}
+                onPress={() =>
+                  saveMutation.mutate({
+                    id: editingAnnouncement?.id,
+                    input: {
+                      ...form,
+                      body: form.body.trim(),
+                      ends_at: form.ends_at?.trim() || null,
+                      starts_at: form.starts_at?.trim() || null,
+                      title: form.title.trim(),
+                    },
+                  })
+                }
+              >
+                {saveMutation.isPending ? <ActivityIndicator color="#ffffff" /> : <CheckCircle2 color="#ffffff" size={18} strokeWidth={2.3} />}
+                <Text style={styles.primaryModalButtonText}>{saveMutation.isPending ? 'Guardando...' : 'Guardar'}</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+function AdminMetricsBlock({ metrics }: { metrics: DashboardAdminMetric[] }) {
+  return (
+    <View style={styles.dashboardBlock}>
+      <View style={styles.blockHeader}>
+        <View style={styles.blockIcon}>
+          <GraduationCap color="#1b6fd7" size={21} strokeWidth={2.2} />
+        </View>
+        <View style={styles.blockHeaderText}>
+          <Text style={styles.blockEyebrow}>Metricas</Text>
+          <Text style={styles.blockTitle}>Resumen y accesos directos</Text>
+        </View>
+      </View>
+      <View style={styles.metricGrid}>
+        {metrics.map((metric) => {
+          const Icon = metricIcon(metric.key);
+
+          return (
+            <View key={metric.key} style={styles.metricCard}>
+              <View style={styles.metricIcon}>
+                <Icon color="#1b6fd7" size={20} strokeWidth={2.2} />
+              </View>
+              <View style={styles.metricText}>
+                <Text style={styles.metricLabel}>{metric.label}</Text>
+                <Text style={styles.metricValue}>{metric.value}</Text>
+                {metric.detail ? <Text style={styles.metricDetail}>{metric.detail}</Text> : null}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function AdminAnnouncementCard({
+  announcement,
+  busy,
+  onDelete,
+  onEdit,
+  onToggleStatus,
+}: {
+  announcement: DashboardAdminAnnouncement;
+  busy: boolean;
+  onDelete: () => void;
+  onEdit: () => void;
+  onToggleStatus: () => void;
+}) {
+  const inactive = announcement.status !== 'activo';
+
+  return (
+    <View style={styles.announcementCard}>
+      <View style={styles.announcementTitleRow}>
+        <Text style={styles.announcementTitle}>{announcement.title}</Text>
+        <Text style={StyleSheet.flatten([styles.statusPill, inactive ? styles.statusPillRead : styles.statusPillNew])}>
+          {announcement.status_label}
+        </Text>
+      </View>
+      <Text numberOfLines={3} style={styles.announcementBody}>{announcement.body}</Text>
+      {announcement.image_url ? <Image source={{ uri: announcement.image_url }} style={styles.announcementImage} /> : null}
+      <Text style={styles.blockMeta}>
+        {announcement.starts_at ? `Desde ${announcement.starts_at}` : 'Sin fecha inicial'}
+        {announcement.ends_at ? ` - Hasta ${announcement.ends_at}` : ''}
+      </Text>
+      <View style={styles.adminAnnouncementActions}>
+        <Pressable style={styles.inlineButton} onPress={onEdit}>
+          <Pencil color="#1b6fd7" size={16} strokeWidth={2.2} />
+          <Text style={styles.inlineButtonText}>Editar</Text>
+        </Pressable>
+        <Pressable disabled={busy} style={StyleSheet.flatten([styles.inlineButton, busy && styles.disabled])} onPress={onToggleStatus}>
+          <Unlock color="#1b6fd7" size={16} strokeWidth={2.2} />
+          <Text style={styles.inlineButtonText}>{inactive ? 'Activar' : 'Inactivar'}</Text>
+        </Pressable>
+        <Pressable disabled={busy} style={StyleSheet.flatten([styles.inlineDangerButton, busy && styles.disabled])} onPress={onDelete}>
+          <Trash2 color="#b42318" size={16} strokeWidth={2.2} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function DashboardField({
+  label,
+  ...props
+}: {
+  keyboardType?: 'default' | 'email-address' | 'number-pad';
+  label: string;
+  multiline?: boolean;
+  onChangeText: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <View style={styles.formField}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <TextInput
+        placeholderTextColor="#94a3b8"
+        style={StyleSheet.flatten([styles.textInput, props.multiline && styles.textInputMultiline])}
+        {...props}
+      />
+    </View>
+  );
+}
+
+function DashboardChoice({ label, onPress, selected }: { label: string; onPress: () => void; selected: boolean }) {
+  return (
+    <Pressable onPress={onPress} style={StyleSheet.flatten([styles.choice, selected && styles.choiceSelected])}>
+      <Text style={StyleSheet.flatten([styles.choiceText, selected && styles.choiceTextSelected])}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -323,8 +722,16 @@ function metricIcon(key: string) {
     return UsersRound;
   }
 
+  if (key === 'tutors') {
+    return UsersRound;
+  }
+
   if (key === 'lessons') {
     return FileText;
+  }
+
+  if (key === 'completed_lessons') {
+    return CheckCircle2;
   }
 
   if (key === 'announcements') {
@@ -377,6 +784,13 @@ function AnnouncementCard({
       ) : null}
     </View>
   );
+}
+
+function confirmDeleteAdminAnnouncement(announcement: DashboardAdminAnnouncement, onConfirm: (id: number) => void) {
+  Alert.alert('Eliminar anuncio', `Eliminar "${announcement.title}"?`, [
+    { style: 'cancel', text: 'Cancelar' },
+    { onPress: () => onConfirm(announcement.id), style: 'destructive', text: 'Eliminar' },
+  ]);
 }
 
 const styles = StyleSheet.create({
@@ -496,6 +910,14 @@ const styles = StyleSheet.create({
     padding: 16,
     width: '100%',
   },
+  iconActionButton: {
+    alignItems: 'center',
+    backgroundColor: '#1b6fd7',
+    borderRadius: 8,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
   profilePrompt: {
     backgroundColor: '#fff7ed',
     borderColor: '#fed7aa',
@@ -594,10 +1016,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     flexBasis: '47%',
-    flexDirection: 'row',
     flexGrow: 1,
-    gap: 10,
-    minHeight: 78,
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 118,
     padding: 12,
   },
   metricIcon: {
@@ -609,15 +1031,17 @@ const styles = StyleSheet.create({
     width: 38,
   },
   metricText: {
-    flex: 1,
-    gap: 2,
+    alignItems: 'center',
+    gap: 3,
     minWidth: 0,
+    width: '100%',
   },
   metricLabel: {
     color: '#64748b',
     fontSize: 12,
     fontWeight: '900',
     lineHeight: 16,
+    textAlign: 'center',
     textTransform: 'uppercase',
   },
   metricValue: {
@@ -625,6 +1049,48 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '900',
     lineHeight: 30,
+    textAlign: 'center',
+  },
+  metricDetail: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 15,
+    textAlign: 'center',
+  },
+  adminAnnouncementActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  inlineButton: {
+    alignItems: 'center',
+    backgroundColor: '#f8fbff',
+    borderColor: '#c7daf7',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    minHeight: 38,
+    paddingHorizontal: 10,
+  },
+  inlineButtonText: {
+    color: '#1b6fd7',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  inlineDangerButton: {
+    alignItems: 'center',
+    backgroundColor: '#fff7f7',
+    borderColor: '#ffd6d6',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 38,
+    paddingHorizontal: 12,
+  },
+  disabled: {
+    opacity: 0.6,
   },
   secondaryButton: {
     alignItems: 'center',
@@ -733,6 +1199,156 @@ const styles = StyleSheet.create({
   inlineActionText: {
     color: '#1b6fd7',
     fontSize: 13,
+    fontWeight: '900',
+  },
+  centeredModalBackdrop: {
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  centeredModalCard: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    gap: 12,
+    padding: 18,
+    paddingBottom: 28,
+  },
+  centeredModalScroll: {
+    maxHeight: '92%',
+  },
+  modalHeaderRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    color: '#151922',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  smallLinkButton: {
+    alignItems: 'center',
+    backgroundColor: '#f2f4f7',
+    borderRadius: 8,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 12,
+  },
+  smallLinkButtonText: {
+    color: '#344054',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  formField: {
+    gap: 6,
+  },
+  imagePickerBlock: {
+    gap: 8,
+  },
+  imagePickerButton: {
+    alignItems: 'center',
+    backgroundColor: '#f8fbff',
+    borderColor: '#c7daf7',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 12,
+  },
+  imagePickerButtonText: {
+    color: '#1b6fd7',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  modalImagePreview: {
+    backgroundColor: '#e2e8f0',
+    borderRadius: 8,
+    height: 150,
+    width: '100%',
+  },
+  inputLabel: {
+    color: '#344054',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  textInput: {
+    backgroundColor: '#ffffff',
+    borderColor: '#d0d5dd',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#151922',
+    fontSize: 15,
+    minHeight: 46,
+    paddingHorizontal: 12,
+  },
+  textInputMultiline: {
+    minHeight: 104,
+    paddingTop: 12,
+    textAlignVertical: 'top',
+  },
+  choiceWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  choice: {
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderColor: '#dce2ea',
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 38,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  choiceSelected: {
+    backgroundColor: '#e8f1ff',
+    borderColor: '#1b6fd7',
+  },
+  choiceText: {
+    color: '#475467',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  choiceTextSelected: {
+    color: '#1b6fd7',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  cancelButton: {
+    alignItems: 'center',
+    backgroundColor: '#f2f4f7',
+    borderRadius: 8,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 14,
+  },
+  cancelButtonText: {
+    color: '#344054',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  primaryModalButton: {
+    alignItems: 'center',
+    backgroundColor: '#1b6fd7',
+    borderRadius: 8,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 14,
+  },
+  primaryModalButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '900',
   },
 });
