@@ -1,5 +1,6 @@
-import { useMutation } from '@tanstack/react-query';
-import { AlertTriangle, HeartHandshake, MessageCircle, Quote, Send } from 'lucide-react-native';
+import { useMutation, type UseMutationResult } from '@tanstack/react-query';
+import { AlertTriangle, HeartHandshake, MessageCircle, Quote, Send, UserPlus } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,14 +12,28 @@ import {
   View,
 } from 'react-native';
 import { getApiErrorMessage } from '../src/api/client';
-import { requestPastoralGuidance } from '../src/api/pastoral';
+import { requestPastoralGuidance, requestPastoralSupport } from '../src/api/pastoral';
 import { ScreenTitle } from '../src/components/ScreenTitle';
 import { PastoralGuidanceResponse } from '../src/types/api';
+
+type PastoralSupportResult = Awaited<ReturnType<typeof requestPastoralSupport>>;
+
+const PASTORAL_GUIDANCE_MAX_LENGTH = 700;
 
 export default function PastoralGuidanceScreen() {
   const [concern, setConcern] = useState('');
   const guidanceMutation = useMutation({
     mutationFn: requestPastoralGuidance,
+  });
+
+  const supportMutation = useMutation({
+    mutationFn: requestPastoralSupport,
+    onSuccess: (response) => {
+      if (response.action === 'chat' && response.conversation_id) {
+        router.push(`/chat/${response.conversation_id}`);
+        return;
+      }
+    },
   });
 
   const canSend = concern.trim().length > 0 && !guidanceMutation.isPending;
@@ -55,7 +70,7 @@ export default function PastoralGuidanceScreen() {
 
         <TextInput
           multiline
-          maxLength={2000}
+          maxLength={PASTORAL_GUIDANCE_MAX_LENGTH}
           onChangeText={setConcern}
           placeholder="Ejemplo: Estoy atravesando ansiedad y necesito recordar que dice la Biblia sobre la paz."
           placeholderTextColor="#94a3b8"
@@ -65,7 +80,9 @@ export default function PastoralGuidanceScreen() {
         />
 
         <View style={styles.inputFooter}>
-          <Text style={styles.counter}>{concern.length}/2000</Text>
+          <Text style={styles.counter}>
+            {concern.length}/{PASTORAL_GUIDANCE_MAX_LENGTH}
+          </Text>
           <Pressable
             disabled={!canSend}
             onPress={submit}
@@ -90,12 +107,18 @@ export default function PastoralGuidanceScreen() {
         </View>
       ) : null}
 
-      {guidanceMutation.data ? <GuidanceResult result={guidanceMutation.data} /> : null}
+      {guidanceMutation.data ? <GuidanceResult result={guidanceMutation.data} supportMutation={supportMutation} /> : null}
     </ScrollView>
   );
 }
 
-function GuidanceResult({ result }: { result: PastoralGuidanceResponse }) {
+function GuidanceResult({
+  result,
+  supportMutation,
+}: {
+  result: PastoralGuidanceResponse;
+  supportMutation: UseMutationResult<PastoralSupportResult, Error, void>;
+}) {
   return (
     <View style={styles.resultGroup}>
       {result.critical ? (
@@ -149,6 +172,28 @@ function GuidanceResult({ result }: { result: PastoralGuidanceResponse }) {
           <Text style={styles.infoText}>
             Te recomendamos hablar con tu tutor/lider para recibir acompanamiento personal y oracion.
           </Text>
+          <Pressable
+            disabled={supportMutation.isPending}
+            onPress={() => supportMutation.mutate()}
+            style={StyleSheet.flatten([styles.supportButton, supportMutation.isPending && styles.primaryButtonDisabled])}
+          >
+            {supportMutation.isPending ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : result.has_tutor ? (
+              <MessageCircle color="#ffffff" size={18} strokeWidth={2.3} />
+            ) : (
+              <UserPlus color="#ffffff" size={18} strokeWidth={2.3} />
+            )}
+            <Text style={styles.primaryButtonText}>
+              {supportMutation.isPending
+                ? 'Enviando...'
+                : result.has_tutor
+                  ? 'Chatear con mi tutor'
+                  : 'Me gustaria tener un tutor'}
+            </Text>
+          </Pressable>
+          {supportMutation.data?.action === 'requested' ? <Text style={styles.supportStatus}>{supportMutation.data.message}</Text> : null}
+          {supportMutation.isError ? <Text style={styles.supportError}>{getApiErrorMessage(supportMutation.error)}</Text> : null}
         </View>
       ) : null}
     </View>
@@ -353,6 +398,7 @@ const styles = StyleSheet.create({
     borderColor: '#bfdbfe',
     borderRadius: 8,
     borderWidth: 1,
+    gap: 12,
     padding: 14,
   },
   infoText: {
@@ -360,5 +406,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     lineHeight: 20,
+  },
+  supportButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#1b6fd7',
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  supportError: {
+    color: '#b42318',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+  },
+  supportStatus: {
+    color: '#047857',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
   },
 });

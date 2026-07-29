@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, ChevronDown, MapPin, Save } from 'lucide-react-native';
+import { Camera, ChevronDown, KeyRound, Mail, MapPin, Pencil, Save, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,11 +10,13 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TextInputProps,
   View,
 } from 'react-native';
-import { me, ProfileUpdateInput, updateProfile } from '../src/api/auth';
+import { me, ProfileUpdateInput, updateProfile, updateProfileEmail, updateProfilePassword } from '../src/api/auth';
 import { getApiErrorMessage } from '../src/api/client';
 import { getArgentinaCities, getArgentinaProvinces, getCountries, isArgentinaNationality, LocationOption } from '../src/api/locations';
+import { AppModal } from '../src/components/AppModal';
 import { ScreenTitle } from '../src/components/ScreenTitle';
 import { ApiUser } from '../src/types/api';
 
@@ -28,9 +30,6 @@ type ProfileForm = {
   state: string;
   city: string;
   postal_code: string;
-  email: string;
-  password: string;
-  password_confirmation: string;
 };
 
 type SelectedAvatar = {
@@ -55,9 +54,6 @@ const emptyForm: ProfileForm = {
   state: '',
   city: '',
   postal_code: '',
-  email: '',
-  password: '',
-  password_confirmation: '',
 };
 
 const emptyBirthDateParts: BirthDateParts = {
@@ -93,9 +89,6 @@ function formFromUser(user: ApiUser): ProfileForm {
     state: user.state ?? '',
     city: user.city ?? '',
     postal_code: user.postal_code ?? '',
-    email: user.email ?? '',
-    password: '',
-    password_confirmation: '',
   };
 }
 
@@ -155,7 +148,14 @@ export default function ProfileScreen() {
   const [form, setForm] = useState<ProfileForm>(emptyForm);
   const [avatar, setAvatar] = useState<SelectedAvatar | undefined>();
   const [birthDateParts, setBirthDateParts] = useState<BirthDateParts>(emptyBirthDateParts);
+  const [emailModalVisible, setEmailModalVisible] = useState(false);
+  const [emailForm, setEmailForm] = useState('');
   const [openSelect, setOpenSelect] = useState<'country' | 'state' | 'city' | null>(null);
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: '',
+    password: '',
+    password_confirmation: '',
+  });
   const [selectSearch, setSelectSearch] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -197,10 +197,33 @@ export default function ProfileScreen() {
     },
   });
 
+  const emailMutation = useMutation({
+    mutationFn: updateProfileEmail,
+    onSuccess: async ({ message, user }) => {
+      const nextForm = formFromUser(user);
+      setForm(nextForm);
+      setEmailForm(user.email ?? '');
+      setEmailModalVisible(false);
+      setStatusMessage(message);
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+
+  const passwordMutation = useMutation({
+    mutationFn: updateProfilePassword,
+    onSuccess: async ({ message }) => {
+      setPasswordForm({ current_password: '', password: '', password_confirmation: '' });
+      setStatusMessage(message);
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+
   useEffect(() => {
     if (meQuery.data) {
       const nextForm = formFromUser(meQuery.data);
       setForm(nextForm);
+      setEmailForm(meQuery.data.email ?? '');
       setBirthDateParts(parseBirthDate(nextForm.birth_date));
     }
   }, [meQuery.data]);
@@ -251,6 +274,11 @@ export default function ProfileScreen() {
     });
   }
 
+  function updatePasswordField(field: keyof typeof passwordForm, value: string) {
+    setStatusMessage(null);
+    setPasswordForm((current) => ({ ...current, [field]: value }));
+  }
+
   function updateOpenSelect(select: 'country' | 'state' | 'city' | null) {
     setOpenSelect(select);
     setSelectSearch('');
@@ -273,12 +301,17 @@ export default function ProfileScreen() {
       avatar,
     };
 
-    if (!payload.password) {
-      delete payload.password;
-      delete payload.password_confirmation;
-    }
-
     updateMutation.mutate(payload);
+  }
+
+  function saveEmail() {
+    setStatusMessage(null);
+    emailMutation.mutate({ new_email: emailForm.trim() });
+  }
+
+  function savePassword() {
+    setStatusMessage(null);
+    passwordMutation.mutate(passwordForm);
   }
 
   if (meQuery.isLoading) {
@@ -412,25 +445,56 @@ export default function ProfileScreen() {
 
       <View style={styles.card}>
         <ScreenTitle icon="profile" size="medium" text="Email y contrasena" />
+        <View style={styles.emailSummary}>
+          <View style={styles.emailSummaryText}>
+            <Text style={styles.fieldLabel}>Correo electronico</Text>
+            <Text style={styles.emailValue}>{user.email}</Text>
+          </View>
+          <Pressable accessibilityRole="button" onPress={() => setEmailModalVisible(true)} style={styles.outlineIconButton}>
+            <Pencil color="#1b6fd7" size={17} strokeWidth={2.2} />
+            <Text style={styles.inlineButtonText}>Editar email</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <ScreenTitle icon="profile" size="medium" text="Contrasena" />
         <ProfileInput
-          autoCapitalize="none"
-          keyboardType="email-address"
-          label="Correo electronico"
-          value={form.email}
-          onChangeText={(value) => updateField('email', value)}
+          autoComplete="off"
+          importantForAutofill="no"
+          label="Contrasena actual"
+          secureTextEntry
+          textContentType="none"
+          value={passwordForm.current_password}
+          onChangeText={(value) => updatePasswordField('current_password', value)}
         />
         <ProfileInput
+          autoComplete="off"
+          importantForAutofill="no"
           label="Nueva contrasena"
           secureTextEntry
-          value={form.password}
-          onChangeText={(value) => updateField('password', value)}
+          textContentType="none"
+          value={passwordForm.password}
+          onChangeText={(value) => updatePasswordField('password', value)}
         />
         <ProfileInput
+          autoComplete="off"
+          importantForAutofill="no"
           label="Confirmar contrasena"
           secureTextEntry
-          value={form.password_confirmation}
-          onChangeText={(value) => updateField('password_confirmation', value)}
+          textContentType="none"
+          value={passwordForm.password_confirmation}
+          onChangeText={(value) => updatePasswordField('password_confirmation', value)}
         />
+        {passwordMutation.isError ? <Text style={styles.error}>{getApiErrorMessage(passwordMutation.error)}</Text> : null}
+        <Pressable
+          disabled={passwordMutation.isPending}
+          style={StyleSheet.flatten([styles.secondaryActionButton, passwordMutation.isPending && styles.primaryButtonDisabled])}
+          onPress={savePassword}
+        >
+          {passwordMutation.isPending ? <ActivityIndicator /> : <KeyRound color="#151922" size={18} strokeWidth={2.3} />}
+          <Text style={styles.secondaryButtonText}>{passwordMutation.isPending ? 'Actualizando...' : 'Actualizar contrasena'}</Text>
+        </Pressable>
       </View>
 
       {statusMessage ? <Text style={styles.status}>{statusMessage}</Text> : null}
@@ -444,6 +508,39 @@ export default function ProfileScreen() {
         {updateMutation.isPending ? <ActivityIndicator color="#ffffff" /> : <Save color="#ffffff" size={18} strokeWidth={2.3} />}
         <Text style={styles.primaryButtonText}>{updateMutation.isPending ? 'Guardando...' : 'Guardar cambios'}</Text>
       </Pressable>
+
+      <AppModal contentStyle={styles.modalCard} onClose={() => setEmailModalVisible(false)} transition="scale" visible={emailModalVisible}>
+        <View style={styles.modalHeader}>
+          <View style={styles.modalTitleRow}>
+            <Mail color="#1b6fd7" size={21} strokeWidth={2.2} />
+            <ScreenTitle icon="profile" size="medium" text="Editar email" />
+          </View>
+          <Pressable accessibilityRole="button" onPress={() => setEmailModalVisible(false)} style={styles.modalCloseButton}>
+            <X color="#151922" size={20} strokeWidth={2.4} />
+          </Pressable>
+        </View>
+        <Text style={styles.muted}>Te enviaremos un enlace de verificacion al nuevo email. El enlace vence en 60 minutos.</Text>
+        <ProfileInput
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          label="Nuevo email"
+          value={emailForm}
+          onChangeText={(value) => {
+            setStatusMessage(null);
+            setEmailForm(value);
+          }}
+        />
+        {emailMutation.isError ? <Text style={styles.error}>{getApiErrorMessage(emailMutation.error)}</Text> : null}
+        <Pressable
+          disabled={emailMutation.isPending || !emailForm.trim()}
+          style={StyleSheet.flatten([styles.primaryButton, (emailMutation.isPending || !emailForm.trim()) && styles.primaryButtonDisabled])}
+          onPress={saveEmail}
+        >
+          {emailMutation.isPending ? <ActivityIndicator color="#ffffff" /> : <Mail color="#ffffff" size={18} strokeWidth={2.3} />}
+          <Text style={styles.primaryButtonText}>{emailMutation.isPending ? 'Enviando...' : 'Enviar verificacion'}</Text>
+        </Pressable>
+      </AppModal>
     </ScrollView>
   );
 }
@@ -586,11 +683,14 @@ function ProfileInput({
   ...inputProps
 }: {
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoComplete?: TextInputProps['autoComplete'];
+  importantForAutofill?: TextInputProps['importantForAutofill'];
   keyboardType?: 'default' | 'email-address' | 'phone-pad';
   label: string;
   onChangeText: (value: string) => void;
   placeholder?: string;
   secureTextEntry?: boolean;
+  textContentType?: TextInputProps['textContentType'];
   value: string;
 }) {
   return (
@@ -751,6 +851,71 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  emailSummary: {
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderColor: '#dce2ea',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    padding: 12,
+  },
+  emailSummaryText: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  emailValue: {
+    color: '#151922',
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 21,
+  },
+  outlineIconButton: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#bdd7ff',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 7,
+    minHeight: 40,
+    paddingHorizontal: 12,
+  },
+  modalCard: {
+    backgroundColor: '#ffffff',
+    borderColor: '#dce2ea',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 14,
+    padding: 16,
+    width: '100%',
+  },
+  modalCloseButton: {
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderColor: '#dce2ea',
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  modalTitleRow: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    minWidth: 0,
+  },
   selectButton: {
     alignItems: 'center',
     backgroundColor: '#f8fafc',
@@ -873,6 +1038,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 18,
     paddingVertical: 14,
+  },
+  secondaryActionButton: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#dce2ea',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 14,
   },
   secondaryButtonText: {
     color: '#151922',

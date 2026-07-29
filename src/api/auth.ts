@@ -21,14 +21,26 @@ export type ProfileUpdateInput = {
   state?: string;
   city?: string;
   postal_code?: string;
-  email?: string;
-  password?: string;
-  password_confirmation?: string;
   avatar?: {
     name: string;
     type: string;
     uri: string;
   };
+};
+
+const profileResponseSchema = z.object({
+  message: z.string().optional(),
+  data: userSchema,
+});
+
+export type ProfileEmailUpdateInput = {
+  new_email: string;
+};
+
+export type ProfilePasswordUpdateInput = {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
 };
 
 export type RegisterInput = {
@@ -104,4 +116,24 @@ export async function updateProfile(input: ProfileUpdateInput) {
   });
 
   return userSchema.parse(extractApiData(response.data));
+}
+
+export async function updateProfileEmail(input: ProfileEmailUpdateInput) {
+  const response = await api.post('/profile', input);
+  const parsed = profileResponseSchema.parse(response.data);
+
+  return {
+    message: parsed.message ?? 'Email actualizado.',
+    user: parsed.data,
+  };
+}
+
+export async function updateProfilePassword(input: ProfilePasswordUpdateInput) {
+  const response = await api.post('/profile', input);
+  const parsed = profileResponseSchema.parse(response.data);
+
+  return {
+    message: parsed.message ?? 'Contrasena actualizada.',
+    user: parsed.data,
+  };
 }

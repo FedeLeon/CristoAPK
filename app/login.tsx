@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Check, Eye, EyeOff, KeyRound, LogIn, UserPlus } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { login } from '../src/api/auth';
 import { getApiErrorMessage } from '../src/api/client';
@@ -14,6 +14,7 @@ import {
 
 export default function LoginScreen() {
   const queryClient = useQueryClient();
+  const passwordInputRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberEmail, setRememberEmail] = useState(false);
@@ -57,6 +58,14 @@ export default function LoginScreen() {
       router.replace('/');
     },
   });
+
+  const canSubmit = Boolean(email.trim() && password && !loginMutation.isPending);
+
+  const submitLogin = () => {
+    if (canSubmit) {
+      loginMutation.mutate();
+    }
+  };
 
   const toggleRememberEmail = async () => {
     const nextValue = !rememberEmail;
@@ -121,7 +130,10 @@ export default function LoginScreen() {
                 importantForAutofill="no"
                 keyboardType="email-address"
                 onChangeText={setEmail}
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
+                returnKeyType="next"
                 spellCheck={false}
+                submitBehavior="submit"
                 style={styles.input}
                 textContentType="none"
                 value={email}
@@ -134,13 +146,17 @@ export default function LoginScreen() {
           <Text style={styles.label}>Password</Text>
           <View style={styles.passwordInput}>
             <TextInput
+              ref={passwordInputRef}
               autoCapitalize="none"
               autoComplete="off"
               autoCorrect={false}
               importantForAutofill="no"
               onChangeText={setPassword}
+              onSubmitEditing={submitLogin}
+              returnKeyType="done"
               secureTextEntry={!showPassword}
               spellCheck={false}
+              submitBehavior="blurAndSubmit"
               style={styles.passwordTextInput}
               textContentType="none"
               value={password}
@@ -182,11 +198,11 @@ export default function LoginScreen() {
         ) : null}
 
         <Pressable
-          disabled={!email.trim() || !password || loginMutation.isPending}
-          onPress={() => loginMutation.mutate()}
+          disabled={!canSubmit}
+          onPress={submitLogin}
           style={[
             styles.primaryButton,
-            (!email.trim() || !password || loginMutation.isPending) && styles.disabledButton,
+            !canSubmit && styles.disabledButton,
           ]}
         >
           <Text style={styles.primaryButtonText}>

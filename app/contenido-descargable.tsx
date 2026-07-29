@@ -16,7 +16,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import {
   AdminDownloadableMaterialInput,
   createAdminDownloadableMaterial,
@@ -42,9 +41,12 @@ const emptyForm: DownloadableFormState = {
   title: '',
 };
 
+const screenTitle = 'Contenido descargable para Pastores';
+
 export default function AdminDownloadableMaterialsScreen() {
   const queryClient = useQueryClient();
   const [editingMaterial, setEditingMaterial] = useState<AdminDownloadableMaterial | null>(null);
+  const [deleteRequested, setDeleteRequested] = useState(false);
   const [form, setForm] = useState<DownloadableFormState>(emptyForm);
   const [formVisible, setFormVisible] = useState(false);
   const [previewMaterial, setPreviewMaterial] = useState<AdminDownloadableMaterial | null>(null);
@@ -105,11 +107,13 @@ export default function AdminDownloadableMaterialsScreen() {
       file: undefined,
       title: material.title,
     });
+    setDeleteRequested(false);
     setFormVisible(true);
   }
 
   function closeForm() {
     setFormVisible(false);
+    setDeleteRequested(false);
     setEditingMaterial(null);
     setForm(emptyForm);
   }
@@ -163,17 +167,6 @@ export default function AdminDownloadableMaterialsScreen() {
     createMutation.mutate(input);
   }
 
-  function confirmDelete(material: AdminDownloadableMaterial) {
-    Alert.alert('Eliminar contenido', `Se eliminara "${material.title}".`, [
-      { style: 'cancel', text: 'Cancelar' },
-      {
-        onPress: () => deleteMutation.mutate(material.id),
-        style: 'destructive',
-        text: 'Eliminar',
-      },
-    ]);
-  }
-
   if (meQuery.isLoading) {
     return <CenteredState text="Cargando sesion..." />;
   }
@@ -181,7 +174,7 @@ export default function AdminDownloadableMaterialsScreen() {
   if (!canReadMaterials) {
     return (
       <View style={styles.container}>
-        <ScreenTitle icon="content" text="Contenido descargable" />
+        <ScreenTitle icon="content" text={screenTitle} />
         <Text style={styles.error}>Esta seccion esta disponible para pastores y administradores.</Text>
       </View>
     );
@@ -215,7 +208,7 @@ export default function AdminDownloadableMaterialsScreen() {
           <View style={styles.header}>
             <View style={styles.headerRow}>
               <View style={styles.headerTitle}>
-                <ScreenTitle icon="content" text="Contenido descargable" />
+                <ScreenTitle icon="content" text={screenTitle} />
               </View>
               {canManageMaterials ? (
                 <Pressable accessibilityRole="button" onPress={openCreateForm} style={styles.primaryButton}>
@@ -295,16 +288,45 @@ export default function AdminDownloadableMaterialsScreen() {
             <Text style={styles.primaryButtonText}>{isSaving ? 'Guardando...' : 'Guardar'}</Text>
           </Pressable>
 
-          {editingMaterial ? (
-            <Pressable
-              accessibilityRole="button"
-              disabled={deleteMutation.isPending}
-              onPress={() => confirmDelete(editingMaterial)}
-              style={[styles.dangerButtonLarge, deleteMutation.isPending && styles.disabled]}
-            >
-              <Trash2 color="#b42318" size={18} strokeWidth={2.3} />
-              <Text style={styles.dangerButtonText}>{deleteMutation.isPending ? 'Eliminando...' : 'Eliminar archivo'}</Text>
-            </Pressable>
+          {editingMaterial && deleteRequested ? (
+            <View style={styles.deleteConfirmBox}>
+              <Text style={styles.deleteConfirmTitle}>Eliminar archivo</Text>
+              <Text style={styles.muted}>Se eliminara "{editingMaterial.title}". Esta accion no se puede deshacer.</Text>
+              {deleteMutation.isError ? <Text style={styles.error}>{getApiErrorMessage(deleteMutation.error)}</Text> : null}
+              <View style={styles.confirmActionsRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={deleteMutation.isPending}
+                  onPress={() => setDeleteRequested(false)}
+                  style={[styles.secondaryButton, deleteMutation.isPending && styles.disabled]}
+                >
+                  <X color="#151922" size={18} strokeWidth={2.2} />
+                  <Text style={styles.secondaryButtonText}>Cancelar</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={deleteMutation.isPending}
+                  onPress={() => deleteMutation.mutate(editingMaterial.id)}
+                  style={[styles.dangerButtonLarge, styles.confirmDeleteButton, deleteMutation.isPending && styles.disabled]}
+                >
+                  <Trash2 color="#b42318" size={18} strokeWidth={2.3} />
+                  <Text style={styles.dangerButtonText}>{deleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : editingMaterial ? (
+            <>
+              {deleteMutation.isError ? <Text style={styles.error}>{getApiErrorMessage(deleteMutation.error)}</Text> : null}
+              <Pressable
+                accessibilityRole="button"
+                disabled={deleteMutation.isPending}
+                onPress={() => setDeleteRequested(true)}
+                style={[styles.dangerButtonLarge, deleteMutation.isPending && styles.disabled]}
+              >
+                <Trash2 color="#b42318" size={18} strokeWidth={2.3} />
+                <Text style={styles.dangerButtonText}>Eliminar archivo</Text>
+              </Pressable>
+            </>
           ) : null}
         </ScrollView>
       </AppModal>
@@ -324,13 +346,8 @@ export default function AdminDownloadableMaterialsScreen() {
             <View style={styles.previewFrame}>
               {previewMaterial.type === 'image' && previewMaterial.url ? (
                 <Image resizeMode="contain" source={{ uri: previewMaterial.url }} style={styles.previewImage} />
-              ) : previewMaterial.url ? (
-                <WebView source={{ uri: previewMaterial.url }} style={styles.previewWebView} />
               ) : (
-                <View style={styles.previewEmpty}>
-                  <FileText color="#64748b" size={34} strokeWidth={2.1} />
-                  <Text style={styles.muted}>El archivo no tiene una URL disponible.</Text>
-                </View>
+                <DownloadablePreview material={previewMaterial} />
               )}
             </View>
           </View>
@@ -385,7 +402,7 @@ function MaterialCard({
           <Eye color="#151922" size={18} strokeWidth={2.2} />
           <Text style={styles.secondaryButtonText}>Ver</Text>
         </Pressable>
-        <Pressable disabled={!material.url} style={[styles.secondaryButton, !material.url && styles.disabled]} onPress={() => material.url && Linking.openURL(material.url)}>
+        <Pressable disabled={!material.url} style={[styles.secondaryButton, !material.url && styles.disabled]} onPress={() => openMaterialUrl(material.url)}>
           <Download color="#151922" size={18} strokeWidth={2.2} />
           <Text style={styles.secondaryButtonText}>Descargar</Text>
         </Pressable>
@@ -400,6 +417,30 @@ function MaterialCard({
   );
 }
 
+function DownloadablePreview({ material }: { material: AdminDownloadableMaterial }) {
+  const Icon = materialIcon(material.type);
+
+  return (
+    <View style={styles.previewEmpty}>
+      <View style={styles.previewFileIcon}>
+        <Icon color="#1b6fd7" size={30} strokeWidth={2.2} />
+      </View>
+      <Text numberOfLines={2} style={styles.previewFileTitle}>
+        {material.original_name ?? material.title}
+      </Text>
+      <Text style={styles.muted}>
+        {material.url ? 'Abrilo con el visor del dispositivo o descargalo para verlo completo.' : 'El archivo no tiene una URL disponible.'}
+      </Text>
+      {material.url ? (
+        <Pressable accessibilityRole="button" onPress={() => openMaterialUrl(material.url)} style={styles.previewOpenButton}>
+          <Download color="#ffffff" size={18} strokeWidth={2.3} />
+          <Text style={styles.primaryButtonText}>Abrir archivo</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 function materialIcon(type: string) {
   if (type === 'image') {
     return ImageIcon;
@@ -410,6 +451,18 @@ function materialIcon(type: string) {
   }
 
   return FileText;
+}
+
+async function openMaterialUrl(url?: string | null) {
+  if (!url) {
+    return;
+  }
+
+  try {
+    await Linking.openURL(url);
+  } catch {
+    Alert.alert('No se pudo abrir', 'El dispositivo no pudo abrir este archivo. Intenta descargarlo nuevamente.');
+  }
 }
 
 function formatBytes(bytes: number) {
@@ -495,6 +548,15 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 20,
   },
+  confirmActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  confirmDeleteButton: {
+    flex: 1,
+    minWidth: 120,
+  },
   dangerButtonLarge: {
     alignItems: 'center',
     backgroundColor: '#fff5f5',
@@ -510,6 +572,19 @@ const styles = StyleSheet.create({
   dangerButtonText: {
     color: '#b42318',
     fontSize: 14,
+    fontWeight: '900',
+  },
+  deleteConfirmBox: {
+    backgroundColor: '#fff5f5',
+    borderColor: '#fecdca',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
+  },
+  deleteConfirmTitle: {
+    color: '#b42318',
+    fontSize: 15,
     fontWeight: '900',
   },
   disabled: {
@@ -682,6 +757,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 16,
   },
+  previewFileIcon: {
+    alignItems: 'center',
+    backgroundColor: '#e8f1ff',
+    borderRadius: 8,
+    height: 58,
+    justifyContent: 'center',
+    width: 58,
+  },
+  previewFileTitle: {
+    color: '#151922',
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 22,
+    textAlign: 'center',
+  },
   previewFrame: {
     backgroundColor: '#f8fafc',
     borderColor: '#dce2ea',
@@ -699,9 +789,15 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
     width: '100%',
   },
-  previewWebView: {
-    backgroundColor: '#ffffff',
-    flex: 1,
+  previewOpenButton: {
+    alignItems: 'center',
+    backgroundColor: '#1b6fd7',
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 16,
   },
   secondaryButton: {
     alignItems: 'center',

@@ -49,6 +49,10 @@ function iconForNotification(notification: AppNotification): NotificationIconCon
     return { color: '#1d4ed8', icon: UserPlus };
   }
 
+  if (type === 'StudentTutorRequestedAdminNotification' || type === 'StudentTutorRequestReceivedNotification') {
+    return { color: '#1d4ed8', icon: UserPlus };
+  }
+
   if (type === 'NewUserRegisteredAdminNotification') {
     if (notification.role === 'pastor') {
       return { color: '#7c3aed', icon: HeartHandshake };

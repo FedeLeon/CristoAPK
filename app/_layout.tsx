@@ -645,7 +645,7 @@ function BottomNavigation({
   return (
     <View style={styles.bottomNavigationShell}>
       {openMenu === 'content' ? (
-        <View style={[styles.dropdownMenu, isAdmin && styles.dropdownMenuStack, { bottom: bottomNavHeight }]}>
+        <View style={[styles.dropdownMenu, isAdmin && styles.dropdownMenuStack, isPastor && styles.dropdownMenuGrid, { bottom: bottomNavHeight }]}>
           {isAdmin ? (
             <>
               <BottomMenuGroup title="Contenido Educativo">
@@ -667,9 +667,24 @@ function BottomNavigation({
             </>
           ) : isPastor ? (
             <>
-              <BottomMenuItem icon={ClipboardCheck} label="Examenes" onPress={() => navigateFromBottomMenu('/cursos-pastorales', 1)} />
-              <BottomMenuItem icon={Download} label="Descargables" onPress={() => navigateFromBottomMenu('/contenido-descargable', 1)} />
-              <BottomMenuItem icon={BookOpen} label="Biblia" onPress={() => navigateFromBottomMenu('/biblia', 1)} />
+              <BottomMenuItem
+                icon={ClipboardCheck}
+                label="Examenes"
+                onPress={() => navigateFromBottomMenu('/cursos-pastorales', 1)}
+                style={styles.dropdownMenuGridItem}
+              />
+              <BottomMenuItem
+                icon={Download}
+                label="Descargables"
+                onPress={() => navigateFromBottomMenu('/contenido-descargable', 1)}
+                style={styles.dropdownMenuGridItem}
+              />
+              <BottomMenuItem
+                icon={BookOpen}
+                label="Biblia"
+                onPress={() => navigateFromBottomMenu('/biblia', 1)}
+                style={styles.dropdownMenuGridItem}
+              />
             </>
           ) : (
             <>
@@ -1191,12 +1206,14 @@ const styles = StyleSheet.create({
   dropdownMenuGrid: {
     flexWrap: 'wrap',
     gap: 8,
+    justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   dropdownMenuGridItem: {
     flexBasis: '48%',
-    flexGrow: 1,
+    flexGrow: 0,
+    flexShrink: 0,
   },
   dropdownMenuStack: {
     flexDirection: 'column',

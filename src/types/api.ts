@@ -235,6 +235,13 @@ export const pastoralGuidanceResponseSchema = z.object({
   recommend_tutor: z.boolean(),
   critical: z.boolean(),
   error: z.string().nullable().optional(),
+  has_tutor: z.boolean().optional(),
+});
+
+export const pastoralSupportResponseSchema = z.object({
+  action: z.enum(['chat', 'requested']),
+  conversation_id: z.number().nullable().optional(),
+  message: z.string(),
 });
 
 export const tutorStudentSchema = z.object({

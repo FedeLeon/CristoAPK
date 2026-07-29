@@ -12,7 +12,7 @@ import {
   Sun,
 } from 'lucide-react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -83,6 +83,7 @@ export default function BibleScreen() {
   const params = useLocalSearchParams<{ book?: string; chapter?: string }>();
   const routeBookId = getFirstParam(params.book);
   const routeChapter = getFirstParam(params.chapter);
+  const scrollViewRef = useRef<ScrollView | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
@@ -146,6 +147,16 @@ export default function BibleScreen() {
       setSelectedChapterId(String(routeSelectedChapter.id));
     }
   }, [chaptersQuery.data, routeChapter, selectedChapterId]);
+
+  useEffect(() => {
+    if (!selectedChapterId) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    });
+  }, [selectedChapterId]);
 
   const visibleBooks = useMemo(() => {
     if (!selectedVersion) {
@@ -229,7 +240,7 @@ export default function BibleScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView ref={scrollViewRef} contentContainerStyle={styles.container}>
       <View style={styles.header}>
         <ScreenTitle icon="bible" text={selectedChapter ? `${selectedBook?.name} ${selectedChapter.number}` : 'Biblia'} />
         <Text style={styles.muted}>
